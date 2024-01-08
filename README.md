@@ -10,3 +10,6 @@ Mamba in PyTorch with a simple parallel scan implementation
 exemples a mettre (ipynb) :
 -entrainement E2E d'une tache simple
 -load model HF
+
+
+-todo
