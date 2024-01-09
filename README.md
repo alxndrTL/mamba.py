@@ -5,9 +5,9 @@ A straightfoward implementation of Mamba in PyTorch with a simple parallel scan 
 
 -pq ce repo ?
 
-<center>
+<p align="center">
     <img src="img/logo.png" alt="Image Description" width="500" height="500"/>
-</center>
+</p>
 
 -utilisation simple (def et forward)
 
