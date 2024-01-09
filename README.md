@@ -6,7 +6,7 @@ A straightfoward implementation of Mamba in PyTorch with a simple parallel scan 
 -pq ce repo ?
 
 <p align="center">
-    <img src="img/logo.png" alt="Image Description" width="500" height="500"/>
+    <img src="img/logo.png" alt="Image Description" width="300" height="300" alt="python mamba"/>
 </p>
 
 -utilisation simple (def et forward)
