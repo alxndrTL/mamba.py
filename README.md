@@ -1,5 +1,5 @@
 # mamba.py 🐍 : a simple parallel scan implementation
-A straightfoward implementation of Mamba in PyTorch with a simple parallel scan implementation, offering an major speedup over a a sequential implementation.
+A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a a sequential implementation.
 It combines the ease of read with good performances.
 
 ![speed comparison](img/speed_comparison.png)
@@ -12,7 +12,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 
 <u>The repo is organized as follows : </u>
 - ```pscan.py``` : a PyTorch implementation of Blelloch's parallel scan
-- ```mamba.py``` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (forward and backward).
+- ```mamba.py``` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - ```mamba_lm.py``` : encapsulates a Mamba model in order to use it as a language model
 - ```📁 docs``` : a folder containing annotated explanations about the code, focusing on the parallel scan
 - ```📁 examples``` : two examples of how to use the Mamba model.
