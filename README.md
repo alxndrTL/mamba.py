@@ -63,6 +63,7 @@ There are two basics examples available :
 - [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf), by Guy E. Blelloch (1993).
 - [Parallelizing Linear Recurrent Neural Nets Over Sequence Length](https://arxiv.org/abs/1709.04057) : applies a parallel scan over the sequence in order to get rid of the sequential for-loop
 
+
 ## TODOs
 - docs
 - a step function, used for (auto-regressive) inference.
