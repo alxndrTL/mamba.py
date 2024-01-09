@@ -15,6 +15,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - ```mamba.py``` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (forward and backward).
 - ```mamba_lm.py``` : encapuslates a Mamba model in order to use it as an language model
 - ```📁 docs``` : a folder containing annotated explanations about the code, focusing on the parallel scan
+- ```📁 examples``` : two examples of how to use the Mamba model.
 
 ## Usage
 
