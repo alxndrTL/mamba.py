@@ -10,7 +10,7 @@ from pscan import pscan
 
 """
 
-This file closely follows the mamba_simple.py from the officile Mamba implementation, and the mamba-minimal by @johnma2006
+This file closely follows the mamba_simple.py from the officile Mamba implementation, and the mamba-minimal by @johnma2006.
 The major differences are :
 -the convolution is done with torch.nn.Conv1d
 -the selective scan is done in PyTorch

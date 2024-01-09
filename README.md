@@ -53,7 +53,7 @@ It simply encapsulates a ```Mamba``` object with an embedding layer, a final nor
 ## Examples
 There are two basics examples available :
 - ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
-- ```example_e2e_training.ipynb``` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game.
+- ```example_e2e_training.ipynb``` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
 
 ## Sources and where to learn more
@@ -68,4 +68,4 @@ There are two basics examples available :
 - docs
 - a step function, used for (auto-regressive) inference.
 - write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).
-- use torch.compile(). As for as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate.
+- use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate.

@@ -5,7 +5,7 @@ import torch
 """
 
 An implementation of the parallel scan operation in PyTorch (Blelloch version).
-This code is based on Francois Fleuret’s pscan. However, the keys differences are :
+This code is based on Francois Fleuret’s pscan (all credits to him). However, the keys differences are :
 -it has been written in an iterative way (rather than recursive)
 -the backward pass has been rewritten completely (for numerical stability)
 
