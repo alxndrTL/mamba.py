@@ -28,7 +28,7 @@ class PScan(torch.autograd.Function):
         B, D, L, _ = A.size()
         num_steps = int(math.log2(L))
 
-        # up sweep
+        # up sweep or reduction step
         Aa = A
         Xa = X
         for k in range(num_steps):
@@ -62,13 +62,16 @@ class PScan(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, A_in, X_in):
-        # A_in : (B, L, D, N)
-        # X_in : (B, L, D, N)
+        """
+        Applies the parallel scan operation, as defined above. Returns a new tensor.
 
-        # H : (B, L, D, N)
+        Args:
+            A_in : (B, L, D, N)
+            X_in : (B, L, D, N)
 
-        # applies the parallel scan operation, as defined above.
-        # returns a new tensor.
+        Returns:
+            H : (B, L, D, N)
+        """
 
         # clone tensor (in-place ops)
         A = A_in.clone() # (B, L, D, N)
@@ -87,13 +90,16 @@ class PScan(torch.autograd.Function):
     
     @staticmethod
     def backward(ctx, grad_output_in):
-        # ctx : A_in : (B, L, D, N), X : (B, D, L, N)
-        # grad_output_in : (B, L, D, N)
+        """
+        Flows the gradient from the output to the input. Returns two new tensors.
 
-        # gradA : (B, L, D, N), gradX : (B, L, D, N)
+        Args:
+            ctx : A_in : (B, L, D, N), X : (B, D, L, N)
+            grad_output_in : (B, L, D, N)
 
-        # flows the gradient from the output to the input.
-        # return two new tensors.
+        Returns:
+            gradA : (B, L, D, N), gradX : (B, L, D, N)
+        """
 
         A_in, X = ctx.saved_tensors
 

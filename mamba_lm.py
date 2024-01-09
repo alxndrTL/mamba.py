@@ -29,11 +29,24 @@ class MambaLMConfig(MambaConfig):
         mamba_config_fields = {field.name for field in fields(MambaConfig)}
         filtered_dict = {k: v for k, v in asdict(self).items() if k in mamba_config_fields}
         return MambaConfig(**filtered_dict)
-    
-def from_pretrained(name: str):
-    # ex : 'state-spaces/mamba-130m'
 
-    # adapted from https://github.com/johnma2006/mamba-minimal
+# adapted from https://github.com/johnma2006/mamba-minimal
+def from_pretrained(name: str):
+    """
+    Returns a model loaded with pretrained weights pulled from HuggingFace.
+
+    Args:
+        name: As of now, supports
+            * 'state-spaces/mamba-2.8b-slimpj'
+            * 'state-spaces/mamba-2.8b'
+            * 'state-spaces/mamba-1.4b'
+            * 'state-spaces/mamba-790m'
+            * 'state-spaces/mamba-370m'
+            * 'state-spaces/mamba-130m'
+
+    Returns:
+        model: a Mamba model configured with the proper parameters and initialized with the proper weights
+    """   
 
     from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
     from transformers.utils.hub import cached_file
@@ -96,6 +109,7 @@ class MambaLM(nn.Module):
         return logits
 
     # adapted from https://github.com/johnma2006/mamba-minimal
+    # TODO : replace
     def generate(self, tokenizer, prompt: str, n_tokens_to_gen: int = 50, sample: bool = True, top_k: int = 40):
         self.eval()
     
