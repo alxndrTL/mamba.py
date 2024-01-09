@@ -15,7 +15,6 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - ```mamba.py``` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (forward and backward).
 - ```mamba_lm.py``` : encapuslates a Mamba model in order to use it as an language model
 - ```📁 docs``` : a folder containing annotated explanations about the code, focusing on the parallel scan
-- ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 
 ## Usage
 
@@ -51,7 +50,9 @@ logits = model(x) # (B, L, vocab_size)
 It simply encapsulates a ```Mamba``` object with an embedding layer, a final normalization and a language modeling head.
 
 ## Examples
-- 
+There are two basics examples available :
+- ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
+- ```example_e2e_training.ipynb``` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game.
 
 
 ## Sources and where to learn more
