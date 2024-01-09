@@ -1,13 +1,21 @@
 # mamba.py 🐍 : a simple parallel scan implementation
-A straightfoward implementation of Mamba in PyTorch with a simple parallel scan implementation, offering a nice XXX speedup over a ...
+A straightfoward implementation of Mamba in PyTorch with a simple parallel scan implementation, offering an impressive speedup over a a sequential implementation.
+It combines the ease of read with good performances.
 
 ![speed comparison](img/speed_comparison.png)
 
-This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational : 
+This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational.
 
 <p align="center">
     <img src="img/logo.png" alt="Image Description" width="300" height="300" alt="python mamba"/>
 </p>
+
+<u>The repo is organized as follows : </u>
+- ```pscan.py``` : a PyTorch implementation of Blelloch's parallel scan
+- ```mamba.py``` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (forward and backward).
+- ```mamba_lm.py``` : encapuslates a Mamba model in order to use it as an language model
+- ```📁 docs``` : a folder containing annotated explanations about the code, focusing on the parallel scan
+- ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 
 ## Usage
 
@@ -42,6 +50,10 @@ logits = model(x) # (B, L, vocab_size)
 
 It simply encapsulates a ```Mamba``` object with an embedding layer, a final normalization and a language modeling head.
 
+## Examples
+- 
+
+
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
 - the [Mamba implementation](https://github.com/state-spaces/mamba), which is written in PyTorch but uses a parallel scan written in CUDA. This is the version that is the fastest. 
@@ -49,3 +61,8 @@ It simply encapsulates a ```Mamba``` object with an embedding layer, a final nor
 - [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf), by Guy E. Blelloch (1993).
 - [Parallelizing Linear Recurrent Neural Nets Over Sequence Length](https://arxiv.org/abs/1709.04057) : applies a parallel scan over the sequence in order to get rid of the sequential for-loop
 
+## TODOs
+- docs
+- a step function, used for (auto-regressive) inference.
+- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).
+- use torch.compile(). As for as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate.
