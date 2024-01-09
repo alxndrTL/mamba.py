@@ -7,6 +7,13 @@ import torch.nn.functional as F
 
 from mamba import Mamba, MambaConfig, RMSNorm
 
+
+"""
+
+Encapsulates a Mamba model as language model. It has an embedding layer, and a LM head which maps the model output to logits.
+
+"""
+
 @dataclass
 class MambaLMConfig(MambaConfig):
     vocab_size: int = 32000

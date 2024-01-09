@@ -2,12 +2,19 @@ import math
 
 import torch
 
+"""
+
+An implementation of the parallel scan operation in PyTorch (Blelloch version).
+This code is based on Francois Fleuret’s pscan. However, the keys differences are :
+-it has been written in an iterative way (rather than recursive)
+-the backward pass has been rewritten completely (for numerical stability)
+
+"""
+
 # TODO eviter les .flip() en codant un pscan reverse (avec flag)
 # TODO commentaires en docstring
 
 class PScan(torch.autograd.Function):
-    # an implementation of the Blelloch parallel scan algorithm
-    
     @staticmethod
     def pscan(A, X):
         # A : (B, D, L, N)
