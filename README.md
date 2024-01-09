@@ -17,6 +17,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - ```📁 docs``` : a folder containing annotated explanations about the code, focusing on the parallel scan
 - ```📁 examples``` : two examples of how to use the Mamba model.
 
+
 ## Usage
 
 The most basic usage is to use the ```Mamba``` object ([mamba.py](mamba.py)), which implements a simple Mamba model given a configuration.
