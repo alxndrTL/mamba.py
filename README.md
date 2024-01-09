@@ -1,11 +1,13 @@
 # mamba.py 🐍 : a simple parallel scan implementation
-Mamba in PyTorch with a simple parallel scan implementation
+A straightfoward implementation of Mamba in PyTorch with a simple parallel scan implementation, offering nice XXX
 
-![Alt text](img/speed_comparison.png)
-
--graphique speed comparaison
+![speed comparison](img/speed_comparison.png)
 
 -pq ce repo ?
+
+<div style="text-align: center;">
+    <img src="img/logo.png" alt="Image Description" width="500" height="500"/>
+</div>
 
 -utilisation simple (def et forward)
 
