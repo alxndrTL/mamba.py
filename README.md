@@ -7,7 +7,7 @@ It combines the ease of read with good performances.
 This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational.
 
 <p align="center">
-    <img src="img/logo.png" alt="Image Description" width="300" height="300" alt="python mamba"/>
+    <img src="img/logo.png" alt="a python and a mamba" width="300" height="300" alt="python mamba"/>
 </p>
 
 <u>The repo is organized as follows : </u>
@@ -67,5 +67,6 @@ There are two basics examples available :
 ## TODOs
 - docs
 - a step function, used for (auto-regressive) inference.
+- unfold the for-loops in ```pscan.py``` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)
 - write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).
-- use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate.
+- use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>
