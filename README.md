@@ -2,12 +2,12 @@
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a a sequential implementation.
 It combines the ease of read with good performances.
 
-![speed comparison](img/speed_comparison.png)
+![speed comparison](assets/speed_comparison.png)
 
 This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational.
 
 <p align="center">
-    <img src="img/logo.png" alt="a python and a mamba" width="300" height="300" alt="python mamba"/>
+    <img src="assets/logo.png" alt="a python and a mamba" width="300" height="300" alt="python mamba"/>
 </p>
 
 <u>The repo is organized as follows : </u>
