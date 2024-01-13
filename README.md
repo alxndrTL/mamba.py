@@ -4,6 +4,8 @@ It combines the ease of read with good performances.
 
 ![speed comparison](assets/speed_comparison.png)
 
+This graph shows the training time (forward and backward pass) of a single Mamba layer (```d_model=16, d_state=16```) using 3 different methods : ```CUDA```, which is the official [Mamba implementation](https://github.com/state-spaces/mamba), ```pscan```, which is this repo, and ```sequential```, which is a sequential implementation of the selective scan.
+
 This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational.
 
 <p align="center">
@@ -55,7 +57,6 @@ There are two basics examples available :
 - ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - ```example_e2e_training.ipynb``` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
-
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
 - the [Mamba implementation](https://github.com/state-spaces/mamba), which is written in PyTorch but uses a parallel scan written in CUDA. This is the version that is the fastest. 
@@ -66,7 +67,9 @@ There are two basics examples available :
 
 ## TODOs
 - docs
+- more tests with an increased ```d_model``` (add a Performances section)
 - a step function, used for (auto-regressive) inference.
+- a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)
 - unfold the for-loops in ```pscan.py``` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)
 - write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>

@@ -9,6 +9,8 @@ This code is based on Francois Fleuret’s pscan (all credits to him). However, 
 -it has been written in an iterative way (rather than recursive)
 -the backward pass has been rewritten
 
+Please see docs/pscan.ipynb for a detailed explanation of what happens here.
+
 """
 
 # TODO eviter les .flip() en codant un pscan reverse (avec flag)
