@@ -88,7 +88,7 @@ With ```d_state=16``` (as in ```state-spaces/mamba-2.8b-slimpj```), the gap betw
 
 <p align="center">
     <img src="assets/training_vs_seqlen_d_state_var.png" alt="a python and a mamba" 
-    width="1152" height="260" alt="python mamba"/>
+    width="1152" height="240" alt="python mamba"/>
 </p>
 
 All the previous graph were computed with a batch size of 1, on a A100 80GB.
