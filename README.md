@@ -92,6 +92,7 @@ With `d_state=16` (as in `state-spaces/mamba-2.8b-slimpj`), the gap between the 
 </p>
 
 All the previous graph were computed with a batch size of 1, on a A100 80GB.
+It is a measure of both the forward and backward pass of a single Mamba block.
 
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
