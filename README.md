@@ -52,18 +52,18 @@ logits = model(x) # (B, L, vocab_size)
 
 It simply encapsulates a ```Mamba``` object with an embedding layer, a final normalization and a language modeling head.
 
-## Examples
+## Examples
 There are two basics examples available :
 - ```example_llm.ipynb``` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - ```example_e2e_training.ipynb``` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
-## Performances
+## Performances
 This section provides a more comprehensive performance comparison between ```mamba.py``` and the official Mamba implementation.
 Overall, as the first graph of this file shows, both have approximately the same asymptotic performance with respect to the sequence length. You can think as ```mamba.py``` as a regular Transformer implementation, while the official Mamba implementation is more like FlashAttention v1. Both have their owns advantages.
 
 That being said, does the two implementations have the same asymptotic performances with respect to the other parameters ?
 
-##### ```d_model``` asymptotic performances
+##### `d_model` asymptotic performances
 <p align="center">
     <img src="assets/training_vs_d_model.png" alt="a python and a mamba" 
     width="800" height="413" alt="python mamba"/>
@@ -71,7 +71,7 @@ That being said, does the two implementations have the same asymptotic performan
 
 We can see that both implementations behave the same as we increase ```d_model```. The gap between the two stays roughly the same. (```mamba.py``` is overall ~2x slower)
 
-##### ```d_state``` asymptotic performances
+##### `d_state` asymptotic performances
 <p align="center">
     <img src="assets/training_vs_d_state.png" alt="a python and a mamba" 
     width="800" height="413" alt="python mamba"/>
@@ -96,7 +96,7 @@ All the previous graph were computed with a batch size of 1, on a A100 80GB.
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
 - the [Mamba implementation](https://github.com/state-spaces/mamba), which is written in PyTorch but uses a parallel scan written in CUDA. This is the version that is the fastest. 
-- [a minimal PyTorch implementation of Mamba](https://github.com/johnma2006/mamba-minimal), which implements the scan operation as a sequential loop. This code closely follows [this file](https://github.com/state-spaces/mamba/blob/da2626b5a5f347a8e844ac5e96a2cbcde3c34abb/mamba_ssm/modules/mamba_simple.py) from the officile Mamba implementation, but replaces the CUDA convolution with ```torch.nn.Conv1d```, and the selective scan written in CUDA with a sequential loop. The code of this repo closely follows these 2 files.
+- [a minimal PyTorch implementation of Mamba](https://github.com/johnma2006/mamba-minimal), which implements the scan operation as a sequential loop (its performance are a bit worse than the 'sequential' line in the first graph). This code closely follows [this file](https://github.com/state-spaces/mamba/blob/da2626b5a5f347a8e844ac5e96a2cbcde3c34abb/mamba_ssm/modules/mamba_simple.py) from the officile Mamba implementation, but replaces the CUDA convolution with ```torch.nn.Conv1d```, and the selective scan written in CUDA with a sequential loop. The code of this repo follows the structure of these 2 files.
 - [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf), by Guy E. Blelloch (1993).
 - [Parallelizing Linear Recurrent Neural Nets Over Sequence Length](https://arxiv.org/abs/1709.04057) : applies a parallel scan over the sequence in order to get rid of the sequential for-loop.
 - x.com/fchollet : original pscan implementation.
