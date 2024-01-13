@@ -88,7 +88,7 @@ With ```d_state=16``` (as in ```state-spaces/mamba-2.8b-slimpj```), the gap betw
 
 <p align="center">
     <img src="assets/training_vs_seqlen_d_state_var.png" alt="a python and a mamba" 
-    width="1152" height="289" alt="python mamba"/>
+    width="1152" height="260" alt="python mamba"/>
 </p>
 
 All the previous graph were computed with a batch size of 1, on a A100 80GB.
@@ -103,7 +103,7 @@ All the previous graph were computed with a batch size of 1, on a A100 80GB.
 
 ## TODOs
 - docs
-~~ - more tests with an increased ```d_model``` (add a Performances section) ~~
+- ~~more tests with an increased ```d_model``` (add a Performances section)~~
 - a step function, used for (auto-regressive) inference.
 - a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)
 
