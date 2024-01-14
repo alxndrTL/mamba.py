@@ -68,6 +68,18 @@ class Mamba(nn.Module):
         #x = self.norm_f(x)
 
         return x
+    
+    def step(self, x, caches):
+        # x : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, in1, in2, in3)
+
+        # y : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, in1, in2, in3)
+
+        for i, layer in enumerate(self.layers):
+            x, caches[i] = layer.step(x, caches[i])
+
+        return x, caches
 
 class ResidualBlock(nn.Module):
     def __init__(self, config: MambaConfig):
@@ -83,6 +95,18 @@ class ResidualBlock(nn.Module):
 
         output = self.mixer(self.norm(x)) + x
         return output
+    
+    def step(self, x, cache):
+        # x : (B, D)
+        # cache : (h, in1, in2, in3)
+                # h : (B, ED, N)
+                # in1, in2, in3 : (B, ED)
+
+        # output : (B, D)
+        # cache : (h, in1, in2, in3)
+
+        output, cache = self.mixer.step(self.norm(x), cache) + x
+        return output, cache
 
 class MambaBlock(nn.Module):
     def __init__(self, config: MambaConfig):
