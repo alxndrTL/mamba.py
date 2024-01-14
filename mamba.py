@@ -236,6 +236,85 @@ class MambaBlock(nn.Module):
         y = y + D * x
 
         return y
+    
+    # -------------------------- inference -------------------------- #
+    def step(self, x, cache):
+        # x : (B, D)
+        # cache : (h, in1, in2, in3)
+                # h : (B, ED, N)
+                # in1, in2, in3 : (B, ED)
+        
+        # y : (B, D)
+        # cache : (h, in1, in2, in3)
+        
+        h, in1, in2, in3 = cache
+        
+        xz = self.in_proj(x) # (B, 2*ED)
+        x, z = xz.chunk(2, dim=1) # (B, ED), (B, ED)
+
+        # x branch
+        x_cache = x
+        if in1 is None:
+            x = self.conv1d(x.unsqueeze(2))[:, :, 0]
+        elif in2 is None:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 1]
+        elif in3 is None:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), in2.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 2]
+        else:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), in2.unsqueeze(2), in3.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 3]
+
+        x = F.silu(x)
+        y, h = self.ssm_step(x, h)
+
+        # z branch
+        z = F.silu(z)
+
+        output = y * z
+        output = self.out_proj(output) # (B, D)
+
+        # prepare cache for next call
+        if in1 is None:
+            cache = (h, x_cache, None, None)
+        elif in2 is None:
+            cache = (h, in1, x_cache, None)
+        elif in3 is None:
+            cache = (h, in1, in2, x_cache)
+        else:
+            cache = (h, in2, in3, x_cache)
+        
+        return output, cache
+
+    def ssm_step(self, x, h):
+        # x : (B, ED)
+        # h : (B, ED, N)
+
+        # y : (B, ED)
+        # h : (B, ED, N)
+
+        A = -torch.exp(self.A_log.float()) # (ED, N) # todo : ne pas le faire tout le temps, puisque c'est indépendant de la timestep
+        D = self.D.float()
+        # TODO remove .float()
+
+        deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
+
+        delta, B, C = torch.split(deltaBC, [1, 16, 16], dim=-1) # (B, dt_rank), (B, N), (B, N)
+        delta = F.softplus(self.dt_proj(delta)) # (B, ED)
+
+        deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, ED, N)
+        deltaB = delta.unsqueeze(-1) * B.unsqueeze(1) # (B, ED, N)
+
+        BX = deltaB * (x.unsqueeze(-1)) # (B, ED, N)
+
+        if h is None:
+            h = torch.zeros(x.size(0), x.size(1), 16) # (B, ED, N)
+
+        h = deltaA * h + BX # (B, ED, N)
+
+        y = (h @ C.unsqueeze(-1)).squeeze(2) # (B, ED, N) @ (B, N, 1) -> (B, ED, 1)
+
+        y = y + D * x
+
+        return y, h.squeeze(1)
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):
