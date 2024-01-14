@@ -105,7 +105,8 @@ class ResidualBlock(nn.Module):
         # output : (B, D)
         # cache : (h, in1, in2, in3)
 
-        output, cache = self.mixer.step(self.norm(x), cache) + x
+        output, cache = self.mixer.step(self.norm(x), cache)
+        output = output + x
         return output, cache
 
 class MambaBlock(nn.Module):
@@ -222,7 +223,7 @@ class MambaBlock(nn.Module):
         hs = pscan(deltaA, BX)
 
         #y = (C.unsqueeze(2) * hs).sum(3)
-        y = (hs @ C.unsqueeze(-1)).squeeze() # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
+        y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
 
@@ -255,7 +256,7 @@ class MambaBlock(nn.Module):
         hs = torch.stack(hs, dim=1) # (B, L, ED, N)
 
         #y = (C.unsqueeze(2) * hs).sum(3)
-        y = (hs @ C.unsqueeze(-1)).squeeze() # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
+        y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
 
@@ -321,7 +322,7 @@ class MambaBlock(nn.Module):
 
         deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
 
-        delta, B, C = torch.split(deltaBC, [1, 16, 16], dim=-1) # (B, dt_rank), (B, N), (B, N)
+        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, dt_rank), (B, N), (B, N)
         delta = F.softplus(self.dt_proj(delta)) # (B, ED)
 
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, ED, N)
@@ -330,7 +331,7 @@ class MambaBlock(nn.Module):
         BX = deltaB * (x.unsqueeze(-1)) # (B, ED, N)
 
         if h is None:
-            h = torch.zeros(x.size(0), x.size(1), 16) # (B, ED, N)
+            h = torch.zeros(x.size(0), self.config.d_inner, self.config.d_state, device=deltaA.device) # (B, ED, N)
 
         h = deltaA * h + BX # (B, ED, N)
 
