@@ -7,12 +7,14 @@ import torch.nn.functional as F
 
 from mamba import Mamba, MambaConfig, RMSNorm
 
-
 """
 
 Encapsulates a Mamba model as language model. It has an embedding layer, and a LM head which maps the model output to logits.
 
 """
+
+# TODO generate function : batch size != 1 ? (for now B=1)
+# TODO generate function : top-p sampling
 
 @dataclass
 class MambaLMConfig(MambaConfig):
@@ -107,9 +109,59 @@ class MambaLM(nn.Module):
         logits = self.lm_head(x)
 
         return logits
+    
+    def step(self, token, caches):
+        # token : (B)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        # logits : (B, vocab_size)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        x = self.embedding(token)
+
+        x, caches = self.mamba.step(x, caches)
+        x = self.norm_f(x)
+
+        logits = self.lm_head(x)
+
+        return logits, caches
+    
+    
+    def generate2(self, tokenizer, prompt: str, num_tokens: int, sample: bool = True, top_k: int = 40):
+        self.eval()
+
+        input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
+
+        caches = [(None, torch.zeros(1, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
+
+        for i in range(input_ids.size(1) + num_tokens - 1):
+            with torch.no_grad():
+                next_token_logits, caches = self.step(input_ids[:, i], caches) # (1, vocab_size), caches
+
+            # sample
+            if i+1 >= input_ids.size(1):
+                probs = F.softmax(next_token_logits, dim=-1) # (1, vocab_size)
+
+                if top_k is not None:
+                    values, _ = torch.topk(probs, k=top_k)
+                    probs[probs < values[:, -1, None]] = 0
+                    probs = probs / probs.sum(axis=1, keepdims=True)
+
+                if sample:
+                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (1)
+                else:
+                    next_token = torch.argmax(probs, dim=-1) # (1)
+
+                input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
+                
+        output = [tokenizer.decode(output.tolist()) for output in input_ids][0]
+
+        self.train()
+
+        return output
 
     # adapted from https://github.com/johnma2006/mamba-minimal
-    # TODO : replace
+    # todo : remove
     def generate(self, tokenizer, prompt: str, n_tokens_to_gen: int = 50, sample: bool = True, top_k: int = 40):
         self.eval()
     

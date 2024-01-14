@@ -20,6 +20,7 @@ A sequential version of the selective scan is also available for comparison.
 """
 
 # TODO commenter (notamment ce que fait chaque fonction)
+# TODO remplacer le caractere delta par "delta"
 
 @dataclass
 class MambaConfig:
@@ -70,10 +71,10 @@ class Mamba(nn.Module):
     
     def step(self, x, caches):
         # x : (B, L, D)
-        # caches : [cache(layer) for all layers], cache : (h, inputs)
+        # caches : [cache(layer) for all layers], cache : (h, in1, in2, in3)
 
         # y : (B, L, D)
-        # caches : [cache(layer) for all layers], cache : (h, inputs)
+        # caches : [cache(layer) for all layers], cache : (h, in1, in2, in3)
 
         for i, layer in enumerate(self.layers):
             x, caches[i] = layer.step(x, caches[i])
@@ -97,12 +98,12 @@ class ResidualBlock(nn.Module):
     
     def step(self, x, cache):
         # x : (B, D)
-        # cache : (h, inputs)
+        # cache : (h, in1, in2, in3)
                 # h : (B, ED, N)
-                # inputs: (B, ED, d_conv-1)
+                # in1, in2, in3 : (B, ED)
 
         # output : (B, D)
-        # cache : (h, inputs)
+        # cache : (h, in1, in2, in3)
 
         output, cache = self.mixer.step(self.norm(x), cache)
         output = output + x
@@ -264,21 +265,28 @@ class MambaBlock(nn.Module):
     # -------------------------- inference -------------------------- #
     def step(self, x, cache):
         # x : (B, D)
-        # cache : (h, inputs)
+        # cache : (h, in1, in2, in3)
                 # h : (B, ED, N)
-                # inputs : (B, ED, d_conv-1)
+                # in1, in2, in3 : (B, ED)
         
         # y : (B, D)
-        # cache : (h, inputs)
+        # cache : (h, in1, in2, in3)
         
-        h, inputs = cache
+        h, in1, in2, in3 = cache
         
         xz = self.in_proj(x) # (B, 2*ED)
         x, z = xz.chunk(2, dim=1) # (B, ED), (B, ED)
 
         # x branch
-        x_cache = x.unsqueeze(2)
-        x = self.conv1d(torch.cat([inputs, x_cache], dim=2))[:, :, self.config.d_conv-1] # (B, ED)
+        x_cache = x
+        if in1 is None:
+            x = self.conv1d(x.unsqueeze(2))[:, :, 0]
+        elif in2 is None:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 1]
+        elif in3 is None:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), in2.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 2]
+        else:
+            x = self.conv1d(torch.cat([in1.unsqueeze(2), in2.unsqueeze(2), in3.unsqueeze(2), x.unsqueeze(2)], dim=2))[:, :, 3]
 
         x = F.silu(x)
         y, h = self.ssm_step(x, h)
@@ -290,8 +298,14 @@ class MambaBlock(nn.Module):
         output = self.out_proj(output) # (B, D)
 
         # prepare cache for next call
-        inputs = torch.cat([inputs[:, :, 1:], x_cache], dim=2) # (B, ED, d_conv-1)
-        cache = (h, inputs)
+        if in1 is None:
+            cache = (h, x_cache, None, None)
+        elif in2 is None:
+            cache = (h, in1, x_cache, None)
+        elif in3 is None:
+            cache = (h, in1, in2, x_cache)
+        else:
+            cache = (h, in2, in3, x_cache)
         
         return output, cache
 
