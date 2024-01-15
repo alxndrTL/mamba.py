@@ -126,8 +126,7 @@ class MambaLM(nn.Module):
 
         return logits, caches
     
-    
-    def generate2(self, tokenizer, prompt: str, num_tokens: int, sample: bool = True, top_k: int = 40):
+    def generate(self, tokenizer, prompt: str, num_tokens: int, sample: bool = True, top_k: int = 40):
         self.eval()
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
@@ -159,35 +158,4 @@ class MambaLM(nn.Module):
         self.train()
 
         return output
-
-    # adapted from https://github.com/johnma2006/mamba-minimal
-    # todo : remove
-    def generate(self, tokenizer, prompt: str, n_tokens_to_gen: int = 50, sample: bool = True, top_k: int = 40):
-        self.eval()
     
-        input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device)
-        
-        for _ in range(n_tokens_to_gen):
-            with torch.no_grad():
-                indices_to_input = input_ids
-                next_token_logits = self(indices_to_input)[:, -1]
-            
-            probs = F.softmax(next_token_logits, dim=-1)
-            
-            if top_k is not None:
-                values, _ = torch.topk(probs, k=top_k)
-                probs[probs < values[:, -1, None]] = 0
-                probs = probs / probs.sum(axis=1, keepdims=True)
-            
-            if sample:
-                next_indices = torch.multinomial(probs, num_samples=1)
-            else:
-                next_indices = torch.argmax(probs, dim=-1)[:, None]
-            
-            input_ids = torch.cat([input_ids, next_indices], dim=1)
-
-        output_completions = [tokenizer.decode(output.tolist()) for output in input_ids][0]
-
-        self.train()
-        
-        return output_completions
