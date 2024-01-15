@@ -10,7 +10,7 @@ from pscan import pscan
 
 """
 
-This file closely follows the mamba_simple.py from the officile Mamba implementation, and the mamba-minimal by @johnma2006.
+This file closely follows the mamba_simple.py from the official Mamba implementation, and the mamba-minimal by @johnma2006.
 The major differences are :
 -the convolution is done with torch.nn.Conv1d
 -the selective scan is done in PyTorch
@@ -20,7 +20,6 @@ A sequential version of the selective scan is also available for comparison.
 """
 
 # TODO commenter (notamment ce que fait chaque fonction)
-# TODO remplacer le caractere delta par "delta"
 
 @dataclass
 class MambaConfig:
@@ -68,6 +67,18 @@ class Mamba(nn.Module):
         #x = self.norm_f(x)
 
         return x
+    
+    def step(self, x, caches):
+        # x : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        # y : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        for i, layer in enumerate(self.layers):
+            x, caches[i] = layer.step(x, caches[i])
+
+        return x, caches
 
 class ResidualBlock(nn.Module):
     def __init__(self, config: MambaConfig):
@@ -83,6 +94,19 @@ class ResidualBlock(nn.Module):
 
         output = self.mixer(self.norm(x)) + x
         return output
+    
+    def step(self, x, cache):
+        # x : (B, D)
+        # cache : (h, inputs)
+                # h : (B, ED, N)
+                # inputs: (B, ED, d_conv-1)
+
+        # output : (B, D)
+        # cache : (h, inputs)
+
+        output, cache = self.mixer.step(self.norm(x), cache)
+        output = output + x
+        return output, cache
 
 class MambaBlock(nn.Module):
     def __init__(self, config: MambaConfig):
@@ -198,7 +222,7 @@ class MambaBlock(nn.Module):
         hs = pscan(deltaA, BX)
 
         #y = (C.unsqueeze(2) * hs).sum(3)
-        y = (hs @ C.unsqueeze(-1)).squeeze() # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
+        y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
 
@@ -231,11 +255,98 @@ class MambaBlock(nn.Module):
         hs = torch.stack(hs, dim=1) # (B, L, ED, N)
 
         #y = (C.unsqueeze(2) * hs).sum(3)
-        y = (hs @ C.unsqueeze(-1)).squeeze() # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
+        y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
 
         return y
+    
+    # -------------------------- inference -------------------------- #
+    """
+    Concerning auto-regressive inference
+
+    The cool part of using Mamba : inference is constant wrt to sequence length
+    We just have to keep in cache, for each layer, two things :
+    - the hidden state h (which is (B, ED, N)), as you typically would when doing inference with a RNN
+    - the last d_conv-1 inputs of the layer, to be able to compute the 1D conv which is a convolution over the time dimension
+      (d_conv is fixed so this doesn't incur a growing cache as we progress on generating the sequence)
+      (and d_conv is usually very small, like 4, so we just have to "remember" the last 3 inputs)
+
+    Concretely, these two quantities are put inside a cache tuple, and are named h and inputs respectively.
+    h is (B, ED, N), and inputs is (B, ED, d_conv-1)
+    The MambaBlock.step() receives this cache, and, along with outputing the output, alos outputs the updated cache for the next call.
+
+    The cache object is initialized as follows : (None, torch.zeros()).
+    When h is None, the selective scan function detects it and start with h=0.
+    The torch.zeros() isn't a problem (it's same as just feeding the input, because the conv1d is padded)
+
+    As we need one such cache variable per layer, we store a caches object, which is simply a list of cache object. (See mamba_lm.py)
+    """
+    
+    def step(self, x, cache):
+        # x : (B, D)
+        # cache : (h, inputs)
+                # h : (B, ED, N)
+                # inputs : (B, ED, d_conv-1)
+        
+        # y : (B, D)
+        # cache : (h, inputs)
+        
+        h, inputs = cache
+        
+        xz = self.in_proj(x) # (B, 2*ED)
+        x, z = xz.chunk(2, dim=1) # (B, ED), (B, ED)
+
+        # x branch
+        x_cache = x.unsqueeze(2)
+        x = self.conv1d(torch.cat([inputs, x_cache], dim=2))[:, :, self.config.d_conv-1] # (B, ED)
+
+        x = F.silu(x)
+        y, h = self.ssm_step(x, h)
+
+        # z branch
+        z = F.silu(z)
+
+        output = y * z
+        output = self.out_proj(output) # (B, D)
+
+        # prepare cache for next call
+        inputs = torch.cat([inputs[:, :, 1:], x_cache], dim=2) # (B, ED, d_conv-1)
+        cache = (h, inputs)
+        
+        return output, cache
+
+    def ssm_step(self, x, h):
+        # x : (B, ED)
+        # h : (B, ED, N)
+
+        # y : (B, ED)
+        # h : (B, ED, N)
+
+        A = -torch.exp(self.A_log.float()) # (ED, N) # todo : ne pas le faire tout le temps, puisque c'est indépendant de la timestep
+        D = self.D.float()
+        # TODO remove .float()
+
+        deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
+
+        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, dt_rank), (B, N), (B, N)
+        delta = F.softplus(self.dt_proj(delta)) # (B, ED)
+
+        deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, ED, N)
+        deltaB = delta.unsqueeze(-1) * B.unsqueeze(1) # (B, ED, N)
+
+        BX = deltaB * (x.unsqueeze(-1)) # (B, ED, N)
+
+        if h is None:
+            h = torch.zeros(x.size(0), self.config.d_inner, self.config.d_state, device=deltaA.device) # (B, ED, N)
+
+        h = deltaA * h + BX # (B, ED, N)
+
+        y = (h @ C.unsqueeze(-1)).squeeze(2) # (B, ED, N) @ (B, N, 1) -> (B, ED, 1)
+
+        y = y + D * x
+
+        return y, h.squeeze(1)
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):
