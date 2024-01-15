@@ -105,7 +105,7 @@ It is a measure of both the forward and backward pass of a single Mamba block.
 ## TODOs
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
-- a step function, used for (auto-regressive) inference.
+- ~~a step function, used for (auto-regressive) inference.~~
 - a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)
 
 perfs :
