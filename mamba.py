@@ -212,7 +212,7 @@ class MambaBlock(nn.Module):
 
         # y : (B, L, ED)
     
-        _, L, _ = x.shape
+        _, L, _ = x.shape # todo : no use
 
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, L, ED, N)
         deltaB = delta.unsqueeze(-1) * B.unsqueeze(2) # (B, L, ED, N)
