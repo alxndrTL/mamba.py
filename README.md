@@ -1,5 +1,5 @@
 # mamba.py 🐍 : a simple parallel scan implementation
-A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a a sequential implementation.
+A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation.
 It combines the ease of read with good performances.
 
 ![speed comparison](assets/speed_comparison.png)
