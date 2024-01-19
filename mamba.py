@@ -145,7 +145,8 @@ class MambaBlock(nn.Module):
         inv_dt = dt + torch.log(-torch.expm1(-dt)) # inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
         with torch.no_grad():
             self.dt_proj.bias.copy_(inv_dt)
-        self.dt_proj.bias._no_reinit = True # initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
+        #self.dt_proj.bias._no_reinit = True # initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
+        # todo : explain why removed
 
         # S4D real initialization
         A = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
@@ -346,6 +347,7 @@ class MambaBlock(nn.Module):
 
         y = y + D * x
 
+        # todo : pq h.squeeze(1) ??
         return y, h.squeeze(1)
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py

@@ -126,7 +126,9 @@ class MambaLM(nn.Module):
 
         return logits, caches
     
-    def generate(self, tokenizer, prompt: str, num_tokens: int, sample: bool = True, top_k: int = 40):
+    # TODO temperature
+    # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
+    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, sample: bool = True, top_k: int = 40):
         self.eval()
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
