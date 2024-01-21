@@ -17,9 +17,15 @@ The major differences are :
 
 A sequential version of the selective scan is also available for comparison.
 
-"""
+- A Mamba model is composed of several layers, which are ResidualBlock.
+- A ResidualBlock is composed of a MambaBlock, a normalization, and a residual connection : ResidualBlock(x) = mamba(norm(x)) + x
+- This leaves us with the MambaBlock : its input x is (B, L, D) and its outputs y is also (B, L, D) (B=batch size, L=seq len, D=model dim).
+First, we expand x into (B, L, 2*ED) (where E is usually 2) and split it into x and z, each (B, L, ED).
+Then, we apply the short 1d conv to x, followed by an activation function (silu), then the SSM.
+We then multiply it by silu(z).
+See Figure 3 of the paper (page 8) for a visual representation of a MambaBlock.
 
-# TODO commenter (notamment ce que fait chaque fonction)
+"""
 
 @dataclass
 class MambaConfig:
@@ -168,7 +174,7 @@ class MambaBlock(nn.Module):
 
         # x branch
         x = x.transpose(1, 2) # (B, ED, L)
-        x = self.conv1d(x)[:, :, :L]
+        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
         x = x.transpose(1, 2) # (B, L, ED)
 
         x = F.silu(x)
@@ -212,8 +218,6 @@ class MambaBlock(nn.Module):
         # D : (ED)
 
         # y : (B, L, ED)
-    
-        _, L, _ = x.shape # todo : no use
 
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, L, ED, N)
         deltaB = delta.unsqueeze(-1) * B.unsqueeze(2) # (B, L, ED, N)
@@ -222,7 +226,6 @@ class MambaBlock(nn.Module):
         
         hs = pscan(deltaA, BX)
 
-        #y = (C.unsqueeze(2) * hs).sum(3)
         y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
@@ -255,7 +258,6 @@ class MambaBlock(nn.Module):
             
         hs = torch.stack(hs, dim=1) # (B, L, ED, N)
 
-        #y = (C.unsqueeze(2) * hs).sum(3)
         y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x

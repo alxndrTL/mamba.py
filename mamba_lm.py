@@ -133,18 +133,23 @@ class MambaLM(nn.Module):
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
 
+        # caches is a list of cache, one per layer
+        # cache is composed of : the hidden state, and the last d_conv-1 inputs
+        # the hidden state because the update is like an RNN
+        # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
         caches = [(None, torch.zeros(1, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
 
         for i in range(input_ids.size(1) + num_tokens - 1):
             with torch.no_grad():
+                # forward the new output, get new cache
                 next_token_logits, caches = self.step(input_ids[:, i], caches) # (1, vocab_size), caches
 
-            # sample
+            # sample (no sampling when the prompt is being processed)
             if i+1 >= input_ids.size(1):
                 probs = F.softmax(next_token_logits, dim=-1) # (1, vocab_size)
 
                 if top_k is not None:
-                    values, _ = torch.topk(probs, k=top_k)
+                    values, _ = torch.topk(probs, k=top_k) # (1, k) ordered from lowest to biggest
                     probs[probs < values[:, -1, None]] = 0
                     probs = probs / probs.sum(axis=1, keepdims=True)
 

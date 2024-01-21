@@ -81,6 +81,10 @@ class MambaLM(nn.Module):
 
         input_ids = mx.array(tokenizer(prompt, return_tensors='np').input_ids) # (1, tokens_prompt) # (1, num_tokens)
 
+        # caches is a list of cache, one per layer
+        # cache is composed of : the hidden state, and the last d_conv-1 inputs
+        # the hidden state because the update is like an RNN
+        # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
         caches = [(None, mx.zeros([1, self.config.d_conv-1, self.config.d_inner])) for _ in range(self.config.n_layers)]
 
         yield tokenizer.decode(input_ids[:, 0].tolist())
@@ -88,13 +92,13 @@ class MambaLM(nn.Module):
         for i in range(input_ids.shape[1] + n_tokens_to_gen - 1):
             next_token_logits, caches = self.step(input_ids[:, i], caches) # (1, vocab_size), caches
 
-            # sample
+            # sample (no sampling when the prompt is being processed)
             if i+1 >= input_ids.shape[1]:
                 
                 if top_k is not None:
                     values = topk(next_token_logits, k=top_k) # (1, k) ordered from lowest to biggest
                     mask = next_token_logits < (values[:, 0, None])
-                    next_token_logits = mx.where(mask, -5000, next_token_logits) # -mx.inf is problematic for now
+                    next_token_logits = mx.where(mask, -5000, next_token_logits) # TODO -mx.inf is problematic for now
 
                 if sample and temperature > 0:
                     next_token = mx.random.categorical(next_token_logits * (1/temperature), num_samples=1)

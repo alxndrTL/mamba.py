@@ -5,8 +5,8 @@ import torch
 
 """
 
-It is a temporary file, as it contains additional functions which are needed but not yet implemented in mlx (as of release v0.0.10).
-The first functions are straightforward, while the depthwise conv is a bit more elaborared.
+This is a temporary file, as it contains additional functions which are needed but not yet implemented in MLX (as of release v0.0.10).
+The first functions are straightforward, while the depthwise 1d convolution is a bit more elaborared.
 
 """
 
@@ -78,9 +78,9 @@ def torch_to_mlx_depthwise_weights(torch_weights):
     """
     
     A convolution is said to be "depthwise" when channel i of the output is only computed by passing the filter overing channel i of the input.
-    In torch, this is equivalent to pass groups=number of channels.
-    Because it is not yet implemented in mlx, a workaround is to zero out the weights of a conv object initialized with groups=1 (ie, output channel i is computing by passing the filter over all input channels)
-    To do that, we need to zero out all elements except those on the "diagonal" :
+    In torch, this is done by setting groups=number of channels.
+    Because it is not yet implemented in MLX, a workaround is to zero out the weights of a conv object initialized with groups=1 (groups=1 is when output channel i is computing by passing the filter over all input channels)
+    To do that, we need to zero out all elements except those on the "diagonal":
     for channels=8 and kernel_size=4, the weights are (8, 4, 8).
     these are composed of 8 x (8, 4, 1) filter, each of those is used to compute one output channel.
     this (8, 4, 1) filter is composed of 8 x (1, 4, 1) filter, each of those is passed over each input channel.

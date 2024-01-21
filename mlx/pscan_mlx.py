@@ -4,9 +4,12 @@ import mlx.core as mx
 """
 
 An implementation of the parallel scan algorithm in MLX (Blelloch version).
-The PyTorch implementation is a bit easier to read.
+The PyTorch implementation is easier to read.
 
-If you want explanation about what's happening here, please see docs/pscan.ipynb.
+In a few words, this algorithm computes the sequence H[t] = A[t] * H[t-1] + X[t] in parallel for all H[t].
+This repaces the naive sequential way of computing this sequence : first H[0], then H[1] and so on.
+
+If you want more explanation about what's happening here, please see docs/pscan.ipynb.
 
 There are a few points which are different from PyTorch :
 - when taking a reshape, we have a new tensor rather than a simple view of it.
@@ -15,7 +18,13 @@ There are a few points which are different from PyTorch :
 - there is no need for hand-written backward computation !
 
 Unfortunately, this parallel scan implementation is not worth it (compared to sequential implementation).
-I suspect it is mainly caused by all the re-write we have to do at the end of each iteration.
+From the different tests I've done, I suspect that it is partly caused by all the re-write we have to do at the end of each iteration. Still, turning them off does not make the pscan
+as fast as in PyTorch (relative to the sequential mode). There is a second version of this pscan (see the commented function) which works with indices only, but still is not competitive.
+
+This is *very different* from what is observed in PyTorch, where the pscan is on the same order of magnitude as the official Mamba impementation (for d_state=16), and orders of
+magnitude faster than the sequential mode.
+
+(Tests were done with a M2 Pro, 16GB)
 
 """
 
@@ -76,6 +85,7 @@ def pscan_f(A, X):
             A[:, :, 2**k-1::2**(k+1)] = mx.concatenate([Aa[:, :, :, 0], mx.array([last_val_aa]).reshape(B, D, 1, -1)], axis=2)
             X[:, :, 2**k-1::2**(k+1)] = mx.concatenate([Xa[:, :, :, 0], mx.array([last_val_xa]).reshape(B, D, 1, -1)], axis=2)
 
+# main function, used in the Mamba model (mamba_mlx.py)
 def pscan(A_in, X_in):
     """
     Applies the parallel scan operation, as defined above. Returns a new tensor.
@@ -94,3 +104,29 @@ def pscan(A_in, X_in):
     pscan_f(A, X)
 
     return X.transpose(0, 2, 1, 3)
+
+"""
+def pscan_f(A, X):
+    # A : (B, D, L, N)
+    # X : (B, D, L, N)
+
+    # This functions is numerically equivalent to the preivous one, but instead of creating new arrays (Aa and Xa) at each iterations, it simply
+    # updates in-place A and X at the correct indices (hence the quite not-understandable code)
+    # (it only works with L being a power of 2)
+
+    # While being faster than the previous one (~4x), it stills is not competitive with the naive sequential implementation
+
+    _, _, L, _ = A.shape
+
+    num_steps = int(math.log2(L))
+
+    for k in range(0, num_steps):
+        temp = 2**(k+1)
+        X[:, :, temp-1::temp] += A[:, :, temp-1::temp] * X[:, :, 2**k-1::temp]
+        A[:, :, temp-1::temp] *= A[:, :, 2**k-1::temp]
+
+    for k in range(num_steps, -1, -1):
+        temp = 2**(k+1)
+        X[:, :, 3*2**k-1::temp] += A[:, :, 3*2**k-1::temp] * X[:, :, temp-1:L-2**k:temp]
+        A[:, :, 3*2**k-1::temp] *= A[:, :, temp-1:L-2**k:temp]
+"""

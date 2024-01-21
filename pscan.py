@@ -14,7 +14,6 @@ Please see docs/pscan.ipynb for a detailed explanation of what happens here.
 """
 
 # TODO eviter les .flip() en codant un pscan reverse (avec flag)
-# TODO commentaires en docstring
 
 class PScan(torch.autograd.Function):
     @staticmethod

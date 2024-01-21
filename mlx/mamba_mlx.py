@@ -8,7 +8,6 @@ import mlx.nn as nn
 from pscan_mlx import pscan
 from misc import softplus, unsqueeze, clamp, DepthWiseConv1d
 
-
 """
 
 This file closely follows the mamba.py written in PyTorch.
@@ -16,9 +15,9 @@ The torch->mlx conversion is pretty straightforward, instead for one particular 
 As of release v0.0.10, mlx doesn't supports "groups" other than 1 for 1d convolutions. But in the official implementation, a depthwise 1d conv is used (ie, set groups to the number of channels).
 A workaround is to actually do a convolution with groups=1, but zero out all the elements of the conv weights except those on the "diagonal". (see misc.py)
 
-A Mamba model is composed of several layers, which are ResidualBlock.
-A ResidualBlock is composed of a MambaBlock, a normalization, and a residual connection : ResidualBlock(x) = mamba(norm(x)) + x
-This leaves us with the MambaBlock : its input x is (B, L, D) and its outputs y is also (B, L, D) (B=batch size, L=seq len, D=model dim).
+- A Mamba model is composed of several layers, which are ResidualBlock.
+- A ResidualBlock is composed of a MambaBlock, a normalization, and a residual connection : ResidualBlock(x) = mamba(norm(x)) + x
+- This leaves us with the MambaBlock : its input x is (B, L, D) and its outputs y is also (B, L, D) (B=batch size, L=seq len, D=model dim).
 First, we expand x into (B, L, 2*ED) (where E is usually 2) and split it into x and z, each (B, L, ED).
 Then, we apply the short 1d conv to x, followed by an activation function (silu), then the SSM.
 We then multiply it by silu(z).
@@ -138,8 +137,7 @@ class MambaBlock(nn.Module):
         # dt weights
         dt_init_std = config.dt_rank**-0.5 * config.dt_scale
  
-        # TODO: disable grad ?
-        # see https://pytorch.org/docs/stable/nn.init.html
+        # TODO: disable grad ? (see see https://pytorch.org/docs/stable/nn.init.html)
         if config.dt_init == "constant":
             self.dt_proj.weight = dt_init_std * mx.ones_like(self.dt_proj.weight)
         elif config.dt_init == "random":
@@ -173,7 +171,7 @@ class MambaBlock(nn.Module):
         x, z = xz.split(indices_or_sections=2, axis=2) # (B, L, ED), (B, L, ED)
 
         # x branch
-        x = self.conv1d(x)[:, :L, :]
+        x = self.conv1d(x)[:, :L, :] # depthwise convolution over time, with a short filter
 
         x = nn.silu(x)
         y = self.ssm(x)
@@ -262,6 +260,27 @@ class MambaBlock(nn.Module):
         return y
     
     # -------------------------- inference -------------------------- #
+    """
+    Concerning auto-regressive inference
+
+    The cool part of using Mamba : inference is constant wrt to sequence length
+    We just have to keep in cache, for each layer, two things :
+    - the hidden state h (which is (B, ED, N)), as you typically would when doing inference with a RNN
+    - the last d_conv-1 inputs of the layer, to be able to compute the 1D conv which is a convolution over the time dimension
+      (d_conv is fixed so this doesn't incur a growing cache as we progress on generating the sequence)
+      (and d_conv is usually very small, like 4, so we just have to "remember" the last 3 inputs)
+
+    Concretely, these two quantities are put inside a cache tuple, and are named h and inputs respectively.
+    h is (B, ED, N), and inputs is (B, ED, d_conv-1)
+    The MambaBlock.step() receives this cache, and, along with outputing the output, alos outputs the updated cache for the next call.
+
+    The cache object is initialized as follows : (None, torch.zeros()).
+    When h is None, the selective scan function detects it and start with h=0.
+    The torch.zeros() isn't a problem (it's same as just feeding the input, because the conv1d is padded)
+
+    As we need one such cache variable per layer, we store a caches object, which is simply a list of cache object. (See mamba_lm.py)
+    """
+
     def step(self, x, cache):
         # x : (B, D)
         # cache : (h, inputs)
