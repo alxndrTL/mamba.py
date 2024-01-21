@@ -66,11 +66,11 @@ But, MLX is not even 2 months old :)
 I will closely follow MLX development to watch for potential upgrades of this MLX implementation.
 
 # Why [mamba.py](../) in MLX ?
-The primary goal is educational : in 2 files only (`pscan_mlx.py` and `mamba_mlx.py`), you have a straightforward implementation of Mamba, which includes a core component of its implementation which is the parallel scan.
+While the primary goal of the PyTorch version is educational, this implementation (with a performing parallel scan) could power future fine-tuning scripts. We are early, as there is still not much resources about fine-tuned Mamba models (see [this](https://github.com/havenhq/mamba-chat)).
 
 Also, the more people play around and train Mamba models, the more we will be able to know better its strengths and limits, allowing us to compare it against its "competitors" (Based, RWKV, StripedHyena, or the Transformer).
 
-And finally, it was a great exercise for me, after having implementing Mamba in PyTorch and not knowing MLX.
+And finally, it was a great exercise for me, after having implemented Mamba in PyTorch and not knowing MLX.
 
 # TODOs
 - add more ready-to-go scripts (training and <b>fine-tuning</b>)
