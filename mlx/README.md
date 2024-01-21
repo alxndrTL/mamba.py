@@ -59,8 +59,8 @@ all the $h_t$ can actually be computed <b>in parallel</b>, thanks to an algorith
 You can learn more about this algorithm and its implementation in `docs/pscan.ipynb` at the root of this repo. 
 As you can see on graph shown on the landing page of this repo, the naive sequential implementation is way slower than implementations than use this parallel scan.
 
-<b>However</b>, it's important to note that while the parallel scan gives correct computations with MLX, it's slow, very slow, so slow that it is actually harmful to use it.
-<b>Why ?</b> The current implementation of the parallel scan (and its natural implementation) uses in-place operations, on views of the input array. As of yet, MLX doesn't have views implemented. (see [this issue](https://github.com/ml-explore/mlx/issues/466)) So at each iteration, we need to write back to our original arrays the numbers we computed. I'm not sure there is a workaround to this, as the algorithm inhenrently uses in-place operations (see `docs`).
+<b>However</b>, it's important to note that while the parallel scan gives correct computations with MLX, it's slow, so slow that it is sometimes actually harmful to use it.
+<b>Why ?</b> It is not yet clear. When translating the algorithm from PyTorch to MLX, a little modification is needed : at each iteration, we need to write back to our original arrays the numbers we computed. This is because MLX doesn't have views implemented (yet?). (see [this issue](https://github.com/ml-explore/mlx/issues/466)). I thus switched to a version which only uses slicing (see `pscan_mlx.py` for more details), but the performances are still lacking behind the sequential version (should be orders of magnitude faster).
 
 But, MLX is not even 2 months old :)
 I will closely follow MLX development to watch for potential upgrades of this MLX implementation.
