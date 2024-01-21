@@ -26,7 +26,7 @@ If you want to do inference with <b>pretrained models</b> (from 130M to 2.8B par
 
 ```
 cd scripts
-python generate.py --prompt="Mamba is a type of" --hf_model_name="state-spaces/mamba-130m" --n_tokens=100
+python3 generate.py --prompt="Mamba is a type of" --hf_model_name="state-spaces/mamba-130m" --n_tokens=100
 ```
 
 It will download the specified model from [HuggingFace](https://huggingface.co/state-spaces), convert it (and save it to disk) to run with MLX, and stream generated words.
