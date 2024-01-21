@@ -1,6 +1,6 @@
 # MLX implementation of Mamba 🐍
 
-This folder contains a full MLX implementation of [Mamba](https://arxiv.org/abs/2312.00752), which allows to train and do inference with Mamba models using an Apple silicon equiped Mac.
+This folder contains a complete MLX implementation of [Mamba](https://arxiv.org/abs/2312.00752), which allows to train and do inference with Mamba models using an Apple silicon equiped Mac.
 Both the <b>forward and backward pass</b> are numerically equivalent to the PyTorch code from `mamba.py`, as well as to the official [Mamba implementation](https://github.com/state-spaces/mamba).
 
 <p align="center">
@@ -40,7 +40,7 @@ state-spaces/mamba-2.8b
 state-spaces/mamba-2.8b-slimpj
 ```
 
-As of today, only full precision inference is supported. On an M2 Pro (16GB), the 790M model runs at ~30tok/s.
+As of today, only single precision inference is supported. On an M2 Pro (16GB), the 790M model runs at ~30tok/s.
 
 Unlike the Transformers, inference doesn't depend on the sequence length, so we just have to carry along a hidden state 😎 (and the last `d_conv-1` inputs, where `d_conv` is usually 4).
 

@@ -95,6 +95,13 @@ With `d_state=16` (as in `state-spaces/mamba-2.8b-slimpj`), the gap between the 
 All the previous graph were computed with a batch size of 1, on a A100 80GB.
 It is a measure of both the forward and backward pass of a single Mamba block.
 
+The previous analysis showed the importance of kernel fusion, which reduces the memory accesses by $O(N)$, which makes the whole process faster.
+
+But memory requierement should also be considered : the official Mamba implementation uses <b>recomputation</b> in the backward pass : rather than keeping in memory the activations computed during the forward pass, it simply recomputes them in the backward pass, when needed. This greatly reduces the memory requierement of the Mamba model when doing training. This is not implemented in this repo.
+
+Hence, this repo implements one of the three techniques mentionned in the Mamba paper that form the so called "hardware-aware selective scan" : the parallel scan.
+We say how kernel fusion impacts the speed while recomputation the memory requierements.
+
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
 - the [Mamba implementation](https://github.com/state-spaces/mamba), which is written in PyTorch but uses a parallel scan written in CUDA. This is the version that is the fastest. 
