@@ -1,12 +1,12 @@
-# mamba.py 🐍 : a simple parallel scan implementation
-A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation.
+# mamba.py 🐍 : a simple and efficient Mamba implementation
+A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.
 It combines the ease of read with good performances.
 
 ![speed comparison](assets/speed_comparison.png)
 
-This graph shows the training time (forward and backward pass) of a single Mamba layer (`d_model=16, d_state=16`) using 3 different methods : `CUDA`, which is the official [Mamba implementation](https://github.com/state-spaces/mamba), `mamba.py`, which is this repo, and `sequential`, which is a  sequential implementation of the selective scan.
+This graph shows the training time (forward and backward pass) of a single Mamba layer (`d_model=16, d_state=16`) using 3 different methods : `CUDA`, which is the official [Mamba implementation](https://github.com/state-spaces/mamba), `mamba.py`, which is this repo, and `sequential`, which is a sequential (RNN-like) implementation of the selective scan.
 
-This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch. Its primary goal is educational.
+This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch as well as MLX. Its primary goal is educational.
 
 <p align="center">
     <img src="assets/logo.png" alt="a python and a mamba" width="300" height="300" alt="python mamba"/>
@@ -16,8 +16,9 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
 - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
+- `📁 mlx` : basically the same code as above, but in MLX.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
-- `📁 examples` : two examples of how to use the Mamba model.
+- `📁 examples` : two examples of how to use the Mamba model in PyTorch.
 
 ## Usage
 
