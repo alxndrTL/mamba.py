@@ -41,9 +41,14 @@ state-spaces/mamba-2.8b
 state-spaces/mamba-2.8b-slimpj
 ```
 
+As of today, only full precision inference is supported. On an M2 Pro (16GB), the 790M runs at ~30tok/s.
+
 Unlike the Transformers, inference doesn't depend on the sequence length, so we just have to carry along a hidden state 😎 (and the last `d_conv-1` inputs, where `d_conv` is usually 4).
 
 As of now, `generate.py` is the only available script. But you can train the model using your own script, just like you would with a Transformer.
+
+# Why [mamba.py](../) in MLX ?
+
 
 # About
 Mamba is a new state-space model that is able to do sequence modeling - just like Transformers do.
@@ -63,5 +68,12 @@ As you can see on graph shown on the landing page of this repo, the naive sequen
 
 But, MLX is not even 2 months old :)
 I will closely follow MLX development to watch for potential upgrades of this MLX implementation.
+
+# TODOs
+- add more ready-to-go scripts (training and <b>fine-tuning</b>)
+- support for mixed precision training ? (see [this](https://github.com/state-spaces/mamba/tree/main?tab=readme-ov-file#precision) from the official Mamba implementation)
+- set device (cpu and gpu) (see [A Simple Example](https://ml-explore.github.io/mlx/build/html/usage/unified_memory.html#a-simple-example) from the MLX docs)
+- see TODOs of the PyTorch versions
+- wait for new MLX updates ;)
 
 Feel free to contribute !
