@@ -65,14 +65,14 @@ As you can see on graph shown on the landing page of this repo, the naive sequen
 But, MLX is not even 2 months old :)
 I will closely follow MLX development to watch for potential upgrades of this MLX implementation.
 
-# Why [mamba.py](../) in MLX ?
+# Why [mamba.py](../) in MLX ?
 While the primary goal of the PyTorch version is educational, this implementation (with a performing parallel scan) could power future fine-tuning scripts. We are early, as there is still not much resources about fine-tuned Mamba models (see [this](https://github.com/havenhq/mamba-chat)).
 
 Also, the more people play around and train Mamba models, the more we will be able to know better its strengths and limits, allowing us to compare it against its "competitors" (Based, RWKV, StripedHyena, or the Transformer).
 
 And finally, it was a great exercise for me, after having implemented Mamba in PyTorch and not knowing MLX.
 
-# TODOs
+# TODOs
 - add more ready-to-go scripts (training and <b>fine-tuning</b>)
 - support for mixed precision training ? (see [this](https://github.com/state-spaces/mamba/tree/main?tab=readme-ov-file#precision) from the official Mamba implementation)
 - set device (cpu and gpu) (see [A Simple Example](https://ml-explore.github.io/mlx/build/html/usage/unified_memory.html#a-simple-example) from the MLX docs)
