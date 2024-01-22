@@ -11,6 +11,8 @@ Both the <b>forward and backward pass</b> are numerically equivalent to the PyTo
 - `pscan_mlx.py` : a MLX implementation of Blelloch's parallel scan.
 - `mamba_mlx.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - `mamba_lm_mlx.py` : encapsulates a Mamba model in order to use it as a language model.
+- `utils.py` : utilitary functions
+- `misc.py` : a temporary file containing functions not yet implemented in MLX
 - `📁 scripts` : example scripts to play around with Mamba.
 
 # Quickstart
