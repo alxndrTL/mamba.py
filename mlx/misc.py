@@ -66,7 +66,7 @@ class DepthWiseConv1d(nn.Module):
                                 kernel_size=kernel_size, bias=True, padding=padding)
 
         # see comment below
-        indices = mx.arange(8)
+        indices = mx.arange(channels)
         mask = mx.zeros_like(self.conv1d.weight)
         mask[indices, :, indices] = 1
         self.conv1d.weight *= mask
