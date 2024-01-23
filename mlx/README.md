@@ -75,7 +75,7 @@ Also, the more people play around and train Mamba models, the more we will be ab
 And finally, it was a great exercise for me, after having implemented Mamba in PyTorch and not knowing MLX.
 
 # TODOs
-- fix large memory footprint at inference (see [this](https://twitter.com/awnihannun/status/1749515431336112275))
+- fix large memory footprint at inference ([issue](https://github.com/alxndrTL/mamba.py/issues/5))
 - add more ready-to-go scripts (training and <b>fine-tuning</b>)
 - support for mixed precision training ? (see [this](https://github.com/state-spaces/mamba/tree/main?tab=readme-ov-file#precision) from the official Mamba implementation)
 - set device (cpu and gpu) (see [A Simple Example](https://ml-explore.github.io/mlx/build/html/usage/unified_memory.html#a-simple-example) from the MLX docs)
