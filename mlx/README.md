@@ -16,6 +16,8 @@ Both the <b>forward and backward pass</b> are numerically equivalent to the PyTo
 - `📁 scripts` : example scripts to play around with Mamba.
 
 # Quickstart
+Make sur you have MLX, PyTorch and transformers installed.
+
 First, you can clone the repo :
 
 ```
