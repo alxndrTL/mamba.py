@@ -34,7 +34,10 @@ def map_mambapy_torch_to_mlx(torch_state_dict):
         if 'conv1d' in key:
             key = key.replace('conv1d', 'conv1d.conv1d')
 
-        new_state_dict[key] = value.numpy()
+        if value.type() == 'torch.BFloat16Tensor':
+            new_state_dict[key] = value.half().numpy()
+        else:
+            new_state_dict[key] = value.numpy()
 
     return new_state_dict
 
