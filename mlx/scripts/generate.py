@@ -35,5 +35,6 @@ if __name__ == "__main__":
     
     mx.set_default_device(mx.gpu)
 
-    for token in model.generate(tokenizer, args.prompt, n_tokens_to_gen=args.n_tokens, temperature=args.temperature, top_k=args.top_k):
-        print(token, end='', flush=True)
+    output = model.generate(tokenizer, args.prompt, n_tokens_to_gen=args.n_tokens, temperature=args.temperature, top_k=args.top_k)
+
+    print(output)

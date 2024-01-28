@@ -87,8 +87,6 @@ class MambaLM(nn.Module):
         # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
         caches = [(None, mx.zeros([1, self.config.d_conv-1, self.config.d_inner])) for _ in range(self.config.n_layers)]
 
-        yield tokenizer.decode(input_ids[:, 0].tolist())
-
         for i in range(input_ids.shape[1] + n_tokens_to_gen - 1):
             next_token_logits, caches = self.step(input_ids[:, i], caches) # (1, vocab_size), caches
 
@@ -106,11 +104,12 @@ class MambaLM(nn.Module):
                     next_token = mx.argmax(next_token_logits, axis=-1)[:, None]
 
                 input_ids = mx.concatenate([input_ids, next_token], axis=1)
-                yield tokenizer.decode(next_token.tolist()[0])
-            else:
-                yield tokenizer.decode(input_ids[:, i+1].tolist())
+
+        output = [tokenizer.decode(output.tolist()) for output in input_ids][0]
 
         self.train()
+
+        return output
     
     @staticmethod
     def from_pretrained(name: str):
