@@ -98,6 +98,9 @@ def torch_to_mlx_depthwise_weights(torch_weights):
     mlx_weights = torch.zeros(channels, kernel_size, channels)
 
     indices = torch.arange(channels)
-    mlx_weights[indices, :, indices] = torch_weights[:, :, 0]
+    if torch_weights[:, :, 0].type() == 'torch.BFloat16Tensor':
+        mlx_weights[indices, :, indices] = torch_weights[:, :, 0].float()
+    else:
+        mlx_weights[indices, :, indices] = torch_weights[:, :, 0]
 
     return mlx_weights
