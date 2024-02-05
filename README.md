@@ -58,6 +58,8 @@ There are two basics examples available :
 - `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
+If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, easily swipe it with a Transformer, come up with your own data, etc ...
+
 ## Performances
 This section provides a more comprehensive performance comparison between `mamba.py` and the official Mamba implementation.
 Overall, as the first graph of this file shows, both have approximately the same asymptotic performance with respect to the sequence length. You can think as `mamba.py` as a regular Transformer implementation, while the official Mamba implementation is more like FlashAttention v1. Both have their owns advantages.
@@ -116,7 +118,7 @@ We say how kernel fusion impacts the speed while recomputation the memory requie
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
 - ~~a step function, used for (auto-regressive) inference.~~
-- a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)
+- ~~a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)~~
 
 perfs :
 - unfold the for-loops in `pscan.py` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)
