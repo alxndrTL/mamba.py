@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pscan import pscan
+from pscan_unfolded import pscan as pscan_unfolded
 
 """
 
@@ -46,6 +47,7 @@ class MambaConfig:
     conv_bias: bool = True
 
     pscan: bool = True # use parallel scan mode or sequential mode when training
+    unfolded : bool = True
 
     def __post_init__(self):
         self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
@@ -224,7 +226,10 @@ class MambaBlock(nn.Module):
 
         BX = deltaB * (x.unsqueeze(-1)) # (B, L, ED, N)
         
-        hs = pscan(deltaA, BX)
+        if self.config.unfolded:
+            hs = pscan_unfolded(deltaA, BX)
+        else:
+            hs = pscan(deltaA, BX)
 
         y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 

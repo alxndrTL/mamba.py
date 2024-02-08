@@ -74,7 +74,7 @@ class PScan(torch.autograd.Function):
             H : (B, L, D, N)
         """
 
-        # clone tensor (in-place ops)
+        # clone tensors (in-place ops)
         A = A_in.clone() # (B, L, D, N)
         X = X_in.clone() # (B, L, D, N)
         

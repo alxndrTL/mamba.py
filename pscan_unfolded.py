@@ -1,6 +1,7 @@
 import math
 
 import torch
+import torch.nn.functional as F
 
 """
 
@@ -14,6 +15,15 @@ Please see docs/pscan.ipynb for a detailed explanation of what happens here.
 """
 
 # TODO eviter les .flip() en codant un pscan reverse (avec flag)
+
+def pad_npo2(X):
+    # X : (B, L, D, N)
+
+    # Y : (B, npo2(L), D, N)
+
+    len_npo2 = 2**math.ceil(math.log2(X.size(1)))
+    pad_tuple = (0, 0, 0, 0, len_npo2 - X.size(1), 0)
+    return F.pad(X, pad_tuple, "constant", 0)
 
 class PScan(torch.autograd.Function):
     @staticmethod
@@ -29,14 +39,13 @@ class PScan(torch.autograd.Function):
         B, D, L, _ = A.size()
         num_steps = int(math.log2(L))
 
-        # up sweep or reduction step
+        # up sweep (last 2 steps unfolded)
         Aa = A
         Xa = X
-        for _ in range(num_steps):
-            T = 2 * (Xa.size(2) // 2)
-
-            Aa = Aa[:, :, :T].view(B, D, T//2, 2, -1)
-            Xa = Xa[:, :, :T].view(B, D, T//2, 2, -1)
+        for _ in range(num_steps-2):
+            T = Xa.size(2)
+            Aa = Aa.view(B, D, T//2, 2, -1)
+            Xa = Xa.view(B, D, T//2, 2, -1)
             
             Xa[:, :, :, 1].add_(Aa[:, :, :, 1].mul(Xa[:, :, :, 0]))
             Aa[:, :, :, 1].mul_(Aa[:, :, :, 0])
@@ -44,19 +53,33 @@ class PScan(torch.autograd.Function):
             Aa = Aa[:, :, :, 1]
             Xa = Xa[:, :, :, 1]
 
-        # down sweep
-        for k in range(num_steps-1, -1, -1):
+        # we have only 4, 2 or 1 nodes left
+        if Xa.size(2) == 4:
+            Xa[:, :, 1].add_(Aa[:, :, 1].mul(Xa[:, :, 0]))
+            Aa[:, :, 1].mul_(Aa[:, :, 0])
+
+            Xa[:, :, 3].add_(Aa[:, :, 3].mul(Xa[:, :, 2] + Aa[:, :, 2].mul(Xa[:, :, 1])))
+            #Aa[:, :, 3].mul_(Aa[:, :, 2]) # todo : virer ?
+        elif Xa.size(2) == 2:
+            Xa[:, :, 1].add_(Aa[:, :, 1].mul(Xa[:, :, 0]))
+            #Aa[:, :, 1].mul_(Aa[:, :, 0]) # todo : virer ?
+            return
+        else:
+            return
+
+        # down sweep (first 2 steps unfolded)
+        Aa = A[:, :, 2**(num_steps-2)-1:L:2**(num_steps-2)]
+        Xa = X[:, :, 2**(num_steps-2)-1:L:2**(num_steps-2)]
+        Xa[:, :, 2].add_(Aa[:, :, 2].mul(Xa[:, :, 1]))
+        Aa[:, :, 2].mul_(Aa[:, :, 1])
+
+        for k in range(num_steps-3, -1, -1):
             Aa = A[:, :, 2**k-1:L:2**k]
             Xa = X[:, :, 2**k-1:L:2**k]
 
-            T = 2 * (Xa.size(2) // 2)
-
-            if T < Xa.size(2):
-                Xa[:, :, -1].add_(Aa[:, :, -1].mul(Xa[:, :, -2]))
-                Aa[:, :, -1].mul_(Aa[:, :, -2])
-
-            Aa = Aa[:, :, :T].view(B, D, T//2, 2, -1)
-            Xa = Xa[:, :, :T].view(B, D, T//2, 2, -1)
+            T = Xa.size(2)
+            Aa = Aa.view(B, D, T//2, 2, -1)
+            Xa = Xa.view(B, D, T//2, 2, -1)
 
             Xa[:, :, 1:, 0].add_(Aa[:, :, 1:, 0].mul(Xa[:, :, :-1, 1]))
             Aa[:, :, 1:, 0].mul_(Aa[:, :, :-1, 1])
@@ -74,13 +97,13 @@ class PScan(torch.autograd.Function):
             H : (B, L, D, N)
         """
 
-        # clone tensor (in-place ops)
-        A = A_in.clone() # (B, L, D, N)
-        X = X_in.clone() # (B, L, D, N)
+        # pad tensors (and clone btw, which is necessary because of the in-place ops)
+        A = pad_npo2(A_in) # (B, npo2(L), D, N)
+        X = pad_npo2(X_in) # (B, npo2(L), D, N)
         
         # prepare tensors
-        A = A.transpose(2, 1) # (B, D, L, N)
-        X = X.transpose(2, 1) # (B, D, L, N)
+        A = A.transpose(2, 1) # (B, D, npo2(L), N)
+        X = X.transpose(2, 1) # (B, D, npo2(L), N)
 
         # parallel scan
         PScan.pscan(A, X)
