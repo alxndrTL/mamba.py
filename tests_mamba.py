@@ -13,22 +13,10 @@ def train(model, num_steps):
         Y = model(X).sum()
         Y.backward()
 
-##### UNFOLDING
-print("with unfolding")
+########### NO UNFOLDING, NO REV
+print("no unfolding, no backward rev")
 
-config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=True)
-model = Mamba(config).to(device)
-
-# warm ups
-for _ in range(5):
-    train(model, num_steps=10)
-    
-time2 = timeit.timeit(lambda: train(model, num_steps=10), number=5)
-
-########### NO UNFOLDING
-print("without unfolding")
-
-config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=False)
+config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=False, rev=False)
 model = Mamba(config).to(device)
 
 # warm ups
@@ -37,5 +25,30 @@ for _ in range(5):
 
 time1 = timeit.timeit(lambda: train(model, num_steps=10), number=5)
 
+##### UNFOLDING, NO REV
+print("with unfolding, no backward rev")
+
+config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=True, rev=False)
+model = Mamba(config).to(device)
+
+# warm ups
+for _ in range(5):
+    train(model, num_steps=10)
+    
+time2 = timeit.timeit(lambda: train(model, num_steps=10), number=5)
+
+##### UNFOLDING, REV
+print("with unfolding, and backward rev")
+
+config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=True, rev=True)
+model = Mamba(config).to(device)
+
+# warm ups
+for _ in range(5):
+    train(model, num_steps=10)
+    
+time3 = timeit.timeit(lambda: train(model, num_steps=10), number=5)
+
 print(time1/100)
 print(time2/100)
+print(time3/100)

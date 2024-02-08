@@ -14,8 +14,6 @@ Please see docs/pscan.ipynb for a detailed explanation of what happens here.
 
 """
 
-# TODO eviter les .flip() en codant un pscan reverse (avec flag)
-
 def pad_npo2(X):
     # X : (B, L, D, N)
 
