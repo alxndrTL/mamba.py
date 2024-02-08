@@ -85,6 +85,59 @@ class PScan(torch.autograd.Function):
             Aa[:, :, 1:, 0].mul_(Aa[:, :, :-1, 1])
 
     @staticmethod
+    def pscan_rev(A, X):
+        # A : (B, D, L, N)
+        # X : (B, D, L, N)
+
+        B, D, L, _ = A.size()
+        num_steps = int(math.log2(L))
+
+        # up sweep (last 2 steps unfolded)
+        Aa = A
+        Xa = X
+        for _ in range(num_steps-2):
+            T = Xa.size(2)
+            Aa = Aa.view(B, D, T//2, 2, -1)
+            Xa = Xa.view(B, D, T//2, 2, -1)
+                    
+            Xa[:, :, :, 0].add_(Aa[:, :, :, 0].mul(Xa[:, :, :, 1]))
+            Aa[:, :, :, 0].mul_(Aa[:, :, :, 1])
+
+            Aa = Aa[:, :, :, 0]
+            Xa = Xa[:, :, :, 0]
+
+        # we have only 4, 2 or 1 nodes left
+        if Xa.size(2) == 4:
+            Xa[:, :, 2].add_(Aa[:, :, 2].mul(Xa[:, :, 3]))
+            Aa[:, :, 2].mul_(Aa[:, :, 3])
+
+            Xa[:, :, 0].add_(Aa[:, :, 0].mul(Xa[:, :, 1] + Aa[:, :, 1].mul(Xa[:, :, 2])))
+            Aa[:, :, 0].mul_(Aa[:, :, 1]) # todo : virer ?
+        elif Xa.size(2) == 2:
+            Xa[:, :, 0].add_(Aa[:, :, 0].mul(Xa[:, :, 1]))
+            #Aa[:, :, 1].mul_(Aa[:, :, 0]) # todo : virer ?
+            return
+        else:
+            return
+
+        # down sweep (first 2 steps unfolded)
+        Aa = A[:, :, 0:L:2**(num_steps-2)]
+        Xa = X[:, :, 0:L:2**(num_steps-2)]
+        Xa[:, :, 1].add_(Aa[:, :, 1].mul(Xa[:, :, 2]))
+        Aa[:, :, 1].mul_(Aa[:, :, 2])
+
+        for k in range(num_steps-3, -1, -1):
+            Aa = A[:, :, 0:L:2**k]
+            Xa = X[:, :, 0:L:2**k]
+
+            T = Xa.size(2)
+            Aa = Aa.view(B, D, T//2, 2, -1)
+            Xa = Xa.view(B, D, T//2, 2, -1)
+
+            Xa[:, :, :-1, 1].add_(Aa[:, :, :-1, 1].mul(Xa[:, :, 1:, 0]))
+            Aa[:, :, :-1, 1].mul_(Aa[:, :, 1:, 0])
+
+    @staticmethod
     def forward(ctx, A_in, X_in):
         """
         Applies the parallel scan operation, as defined above. Returns a new tensor.
@@ -127,24 +180,17 @@ class PScan(torch.autograd.Function):
 
         A_in, X = ctx.saved_tensors
 
-        # clone tensors 
-        A = A_in.clone()
-        # grad_output_in will be cloned with flip()
-
         # prepare tensors
-        A = A.transpose(2, 1) # (B, D, L, N)
-        
-        A = torch.cat((A[:, :, :1], A[:, :, 1:].flip(2)), dim=2) # see hand derivation
-        grad_output_b = grad_output_in.transpose(2, 1)
+        A_in = A_in.transpose(2, 1) # (B, D, L, N)
+        A = torch.nn.functional.pad(A_in[:, :, 1:], (0, 0, 0, 1)) # the padding also clones
 
-        # reverse parallel scan
-        grad_output_b = grad_output_b.flip(2)
-        PScan.pscan(A, grad_output_b)
-        grad_output_b = grad_output_b.flip(2)
+        grad_output = grad_output_in.transpose(2, 1).clone()
+
+        PScan.pscan_rev(A, grad_output)
 
         Q = torch.zeros_like(X)
-        Q[:, :, 1:].add_(X[:, :, :-1] * grad_output_b[:, :, 1:])
+        Q[:, :, 1:].add_(X[:, :, :-1] * grad_output[:, :, 1:])
 
-        return Q.transpose(2, 1), grad_output_b.transpose(2, 1)
+        return Q.transpose(2, 1), grad_output.transpose(2, 1)
     
 pscan = PScan.apply

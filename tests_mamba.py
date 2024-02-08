@@ -26,7 +26,7 @@ for _ in range(5):
 time2 = timeit.timeit(lambda: train(model, num_steps=10), number=5)
 
 ########### NO UNFOLDING
-print("with no unfolding")
+print("without unfolding")
 
 config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=False)
 model = Mamba(config).to(device)

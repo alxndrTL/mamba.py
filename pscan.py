@@ -110,7 +110,7 @@ class PScan(torch.autograd.Function):
 
         # prepare tensors
         A = A.transpose(2, 1) # (B, D, L, N)
-        A = torch.cat((A[:, :, :1], A[:, :, 1:].flip(2)), dim=2)
+        A = torch.cat((A[:, :, :1], A[:, :, 1:].flip(2)), dim=2) # see hand derivation
         grad_output_b = grad_output_in.transpose(2, 1)
 
         # reverse parallel scan
