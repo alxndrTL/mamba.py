@@ -57,10 +57,8 @@ class PScan(torch.autograd.Function):
             Aa[:, :, 1].mul_(Aa[:, :, 0])
 
             Xa[:, :, 3].add_(Aa[:, :, 3].mul(Xa[:, :, 2] + Aa[:, :, 2].mul(Xa[:, :, 1])))
-            #Aa[:, :, 3].mul_(Aa[:, :, 2]) # todo : virer ?
         elif Xa.size(2) == 2:
             Xa[:, :, 1].add_(Aa[:, :, 1].mul(Xa[:, :, 0]))
-            #Aa[:, :, 1].mul_(Aa[:, :, 0]) # todo : virer ?
             return
         else:
             return
@@ -109,11 +107,9 @@ class PScan(torch.autograd.Function):
             Xa[:, :, 2].add_(Aa[:, :, 2].mul(Xa[:, :, 3]))
             Aa[:, :, 2].mul_(Aa[:, :, 3])
 
-            Xa[:, :, 0].add_(Aa[:, :, 0].mul(Xa[:, :, 1] + Aa[:, :, 1].mul(Xa[:, :, 2])))
-            Aa[:, :, 0].mul_(Aa[:, :, 1]) # todo : virer ?
+            Xa[:, :, 0].add_(Aa[:, :, 0].mul(Xa[:, :, 1].add(Aa[:, :, 1].mul(Xa[:, :, 2]))))
         elif Xa.size(2) == 2:
             Xa[:, :, 0].add_(Aa[:, :, 0].mul(Xa[:, :, 1]))
-            #Aa[:, :, 1].mul_(Aa[:, :, 0]) # todo : virer ?
             return
         else:
             return
