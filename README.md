@@ -2,6 +2,14 @@
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.
 It combines the ease of read with good performances.
 
+## Updates
+- <b>09/02/2024</b> : First part of the performance update. For small sequences (<128), it can speed up training by more than 20% compared to the first version. For setups close to what can found in practice (like in NLP), it can speed up training by 10%.
+
+- <b>22/01/2024</b> : Added a MLX version of `mamba.py`, which supports inference as well as training. This version is similar to PyTorch, and allows Mac users to play around with Mamba models. It was [tested]() on the largest Mamba trained to date (2.8b), as well as 
+
+___
+## Overview
+
 ![speed comparison](assets/speed_comparison.png)
 
 This graph shows the training time (forward and backward pass) of a single Mamba layer (`d_model=16, d_state=16`) using 3 different methods : `CUDA`, which is the official [Mamba implementation](https://github.com/state-spaces/mamba), `mamba.py`, which is this repo, and `sequential`, which is a sequential (RNN-like) implementation of the selective scan.
@@ -60,6 +68,7 @@ There are two basics examples available :
 
 If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, easily swipe it with a Transformer, come up with your own data, etc ...
 
+___
 ## Performances
 This section provides a more comprehensive performance comparison between `mamba.py` and the official Mamba implementation.
 Overall, as the first graph of this file shows, both have approximately the same asymptotic performance with respect to the sequence length. You can think as `mamba.py` as a regular Transformer implementation, while the official Mamba implementation is more like FlashAttention v1. Both have their owns advantages.
@@ -106,6 +115,7 @@ But memory requierement should also be considered : the official Mamba implement
 Hence, this repo implements one of the three techniques mentionned in the Mamba paper that form the so called "hardware-aware selective scan" : the parallel scan.
 We say how kernel fusion impacts the speed while recomputation the memory requierements.
 
+___
 ## Sources and where to learn more
 - the [Mamba paper](https://arxiv.org/abs/2312.00752) : describes the Mamba architecture as implemented in this repo, which allows to model sequences in linear time.
 - the [Mamba implementation](https://github.com/state-spaces/mamba), which is written in PyTorch but uses a parallel scan written in CUDA. This is the version that is the fastest. 
@@ -121,6 +131,6 @@ We say how kernel fusion impacts the speed while recomputation the memory requie
 - ~~a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)~~
 
 perfs :
-- unfold the for-loops in `pscan.py` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)
-- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).
+- ~~unfold the for-loops in `pscan.py` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)~~
+~~- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).~~
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>
