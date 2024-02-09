@@ -164,11 +164,8 @@ class PScan(torch.autograd.Function):
         PScan.pscan(A, X)
 
         ctx.save_for_backward(A_in, X)
-
-        if L == npo2(L): # todo : collapse ?
-            return X.transpose(2, 1)
-        else:
-            return X.transpose(2, 1)[:, :L]
+        
+        return X.transpose(2, 1)[:, :L]
     
     @staticmethod
     def backward(ctx, grad_output_in):
@@ -203,9 +200,6 @@ class PScan(torch.autograd.Function):
         Q = torch.zeros_like(X)
         Q[:, :, 1:].add_(X[:, :, :-1] * grad_output[:, :, 1:])
 
-        if L == npo2(L): # todo : collapse ?
-            return Q.transpose(2, 1), grad_output.transpose(2, 1)
-        else:
-            return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
+        return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
     
 pscan = PScan.apply
