@@ -28,3 +28,5 @@ peak_memory = torch.cuda.max_memory_allocated(device=device)  # Peak memory duri
 print(initial_memory/(1024**2))
 print(peak_memory/(1024**2))
 print("-----------------------------")
+
+# relate bien ce qu'on voit dans nvidia-smi (a qqchose pres : sans le torch-cuda overhead)
