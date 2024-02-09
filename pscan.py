@@ -152,6 +152,7 @@ class PScan(torch.autograd.Function):
     def forward(ctx, A_in, X_in):
         """
         Applies the parallel scan operation, as defined above. Returns a new tensor.
+        If you can, privilege sequence lengths that are powers of two.
 
         Args:
             A_in : (B, L, D, N)
