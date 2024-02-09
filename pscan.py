@@ -6,21 +6,27 @@ import torch.nn.functional as F
 """
 
 An implementation of the parallel scan operation in PyTorch (Blelloch version).
-This code follows the skeleton proposed by Francois Fleuret in his pscan. However, the keys differences are :
--it has been written in an iterative way (rather than recursive)
--the backward pass has been rewritten
-
 Please see docs/pscan.ipynb for a detailed explanation of what happens here.
 
 """
 
 def npo2(len):
+    """
+    Returns the next power of 2 above len
+    """
+
     return 2 ** math.ceil(math.log2(len))
 
 def pad_npo2(X):
-    # X : (B, L, D, N)
+    """
+    Pads input length dim to the next power of 2
 
-    # Y : (B, npo2(L), D, N)
+    Args:
+        X : (B, L, D, N)
+
+    Returns:
+        Y : (B, npo2(L), D, N)
+    """
 
     len_npo2 = npo2(X.size(1))
     pad_tuple = (0, 0, 0, 0, 0, len_npo2 - X.size(1))
@@ -36,6 +42,8 @@ class PScan(torch.autograd.Function):
         # more formally, X will be populated by these values :
         # H[t] = A[t] * H[t-1] + X[t] with H[0] = 0
         # which are computed in parallel (2*log2(T) sequential steps (ideally), instead of T sequential steps)
+
+        # only supports L that is a power of two (mainly for a clearer code)
         
         B, D, L, _ = A.size()
         num_steps = int(math.log2(L))
@@ -87,6 +95,12 @@ class PScan(torch.autograd.Function):
     def pscan_rev(A, X):
         # A : (B, D, L, N)
         # X : (B, D, L, N)
+
+        # the same function as above, but in reverse
+        # (if you flip the input, call pscan, then flip the output, you get what this function outputs)
+        # it is used in the backward pass
+
+        # only supports L that is a power of two (mainly for a clearer code)
 
         B, D, L, _ = A.size()
         num_steps = int(math.log2(L))
@@ -148,11 +162,13 @@ class PScan(torch.autograd.Function):
         """
 
         L = X_in.size(1)
+
+        # cloning is requiered because of the in-place ops
         if L == npo2(L):
             A = A_in.clone()
             X = X_in.clone()
         else:
-            # pad tensors (and clone btw, which is necessary because of the in-place ops)
+            # pad tensors (and clone btw)
             A = pad_npo2(A_in) # (B, npo2(L), D, N)
             X = pad_npo2(X_in) # (B, npo2(L), D, N)
         
@@ -160,11 +176,12 @@ class PScan(torch.autograd.Function):
         A = A.transpose(2, 1) # (B, D, npo2(L), N)
         X = X.transpose(2, 1) # (B, D, npo2(L), N)
 
-        # parallel scan
+        # parallel scan (modifies X in-place)
         PScan.pscan(A, X)
 
         ctx.save_for_backward(A_in, X)
         
+        # slice [:, :L] (cut if there was padding)
         return X.transpose(2, 1)[:, :L]
     
     @staticmethod
@@ -183,18 +200,21 @@ class PScan(torch.autograd.Function):
         A_in, X = ctx.saved_tensors
 
         L = grad_output_in.size(1)
+
+        # cloning is requiered because of the in-place ops
         if L == npo2(L):
             grad_output = grad_output_in.clone()
+            # the next padding will clone A_in
         else:
-            grad_output = pad_npo2(grad_output_in)
-            A_in = pad_npo2(A_in)
+            grad_output = pad_npo2(grad_output_in) # (B, npo2(L), D, N)
+            A_in = pad_npo2(A_in) # (B, npo2(L), D, N)
 
         # prepare tensors
         grad_output = grad_output.transpose(2, 1)
-        A_in = A_in.transpose(2, 1) # (B, D, L, N)
+        A_in = A_in.transpose(2, 1) # (B, D, npo2(L), N)
+        A = torch.nn.functional.pad(A_in[:, :, 1:], (0, 0, 0, 1)) # (B, D, npo2(L), N) shift 1 to the left (see hand derivation)
 
-        A = torch.nn.functional.pad(A_in[:, :, 1:], (0, 0, 0, 1)) # the padding also clones
-
+        # reverse parallel scan (modifies grad_output in-place)
         PScan.pscan_rev(A, grad_output)
 
         Q = torch.zeros_like(X)
