@@ -23,7 +23,7 @@ def pad_npo2(X):
     # Y : (B, npo2(L), D, N)
 
     len_npo2 = npo2(X.size(1))
-    pad_tuple = (0, 0, 0, 0, len_npo2 - X.size(1), 0)
+    pad_tuple = (0, 0, 0, 0, 0, len_npo2 - X.size(1))
     return F.pad(X, pad_tuple, "constant", 0)
 
 class PScan(torch.autograd.Function):
@@ -165,7 +165,10 @@ class PScan(torch.autograd.Function):
 
         ctx.save_for_backward(A_in, X)
 
-        return X.transpose(2, 1)
+        if L == npo2(L): # todo : collapse ?
+            return X.transpose(2, 1)
+        else:
+            return X.transpose(2, 1)[:, :L]
     
     @staticmethod
     def backward(ctx, grad_output_in):
@@ -182,17 +185,27 @@ class PScan(torch.autograd.Function):
 
         A_in, X = ctx.saved_tensors
 
-        # prepare tensors
-        A_in = A_in.transpose(2, 1) # (B, D, L, N)
-        A = torch.nn.functional.pad(A_in[:, :, 1:], (0, 0, 0, 1)) # the padding also clones
+        L = grad_output_in.size(1)
+        if L == npo2(L):
+            grad_output = grad_output_in.clone()
+        else:
+            grad_output = pad_npo2(grad_output_in)
+            A_in = pad_npo2(A_in)
 
-        grad_output = grad_output_in.transpose(2, 1).clone()
+        # prepare tensors
+        grad_output = grad_output.transpose(2, 1)
+        A_in = A_in.transpose(2, 1) # (B, D, L, N)
+
+        A = torch.nn.functional.pad(A_in[:, :, 1:], (0, 0, 0, 1)) # the padding also clones
 
         PScan.pscan_rev(A, grad_output)
 
         Q = torch.zeros_like(X)
         Q[:, :, 1:].add_(X[:, :, :-1] * grad_output[:, :, 1:])
 
-        return Q.transpose(2, 1), grad_output.transpose(2, 1)
+        if L == npo2(L): # todo : collapse ?
+            return Q.transpose(2, 1), grad_output.transpose(2, 1)
+        else:
+            return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
     
 pscan = PScan.apply
