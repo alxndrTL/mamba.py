@@ -10,6 +10,11 @@ Please see docs/pscan.ipynb for a detailed explanation of what happens here.
 
 """
 
+def print_memory_usage(tensor_name):
+    print(f"{tensor_name} memory allocated: {torch.cuda.memory_allocated() / 1e6} MB")
+    print(f"{tensor_name} memory reserved: {torch.cuda.memory_reserved() / 1e6} MB")
+
+
 def npo2(len):
     """
     Returns the next power of 2 above len
@@ -197,7 +202,7 @@ class PScan(torch.autograd.Function):
         Returns:
             gradA : (B, L, D, N), gradX : (B, L, D, N)
         """
-
+        
         A_in, X = ctx.saved_tensors
 
         L = grad_output_in.size(1)
@@ -224,7 +229,3 @@ class PScan(torch.autograd.Function):
         return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
     
 pscan = PScan.apply
-
-# TODO https://pytorch.org/docs/stable/notes/extending.html
-# mark_dirty() must be used to mark any input that is modified inplace by the forward function.
-# so we can avoid the cloning ?
