@@ -30,8 +30,9 @@ class MyModel(nn.Module):
         """
 
         X = torch.utils.checkpoint.checkpoint(self.custom(self.fc1), X, use_reentrant=False)
-        X = torch.utils.checkpoint.checkpoint(self.custom(self.fc2), X, use_reentrant=False)
+        #X = torch.utils.checkpoint.checkpoint(self.custom(self.fc2), X, use_reentrant=False)
         #X = torch.utils.checkpoint.checkpoint(self.custom(self.fc3), X, use_reentrant=False)
+        X = self.fc2(X)
         X = self.fc3(X)
         X = torch.utils.checkpoint.checkpoint(self.custom(self.fc4), X, use_reentrant=False)
 

@@ -58,3 +58,7 @@ peak_memory_all = torch.cuda.max_memory_allocated(device=device)
 print(f"{initial_memory/(1024**2)}MB")
 print(f"{peak_memory_fwd/(1024**2)}MB")
 print(f"{(peak_memory_all)/(1024**2)}MB")
+
+# pytorch memory resources
+# https://www.sicara.fr/blog-technique/2019-28-10-deep-learning-memory-usage-and-pytorch-optimization-tricks
+# https://github.com/prigoyal/pytorch_memonger/tree/master
