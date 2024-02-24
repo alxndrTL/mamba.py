@@ -7,7 +7,7 @@ device = "cuda"
 
 B, L, D, N = 16, 1024, 1024, 16
 
-config = MambaConfig(d_model=D, n_layers=8, d_state=N, unfolded=True, rev=True, version='3')
+config = MambaConfig(d_model=D, n_layers=8, d_state=N)
 model = Mamba(config).to(device)
 
 X = torch.randn(B, L, D).to(device, non_blocking=True)
