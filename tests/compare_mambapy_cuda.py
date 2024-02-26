@@ -30,7 +30,7 @@ print(y_cuda.shape)
 
 torch.manual_seed(1)
 
-config = MambaConfig(d_model=dim, n_layers=1, unfolded=True, rev=True, version='2')
+config = MambaConfig(d_model=dim, n_layers=1)
 model = MambaBlock(config).to("cuda")
 
 y_pscan = model(x)
