@@ -127,41 +127,45 @@ class MambaLM(nn.Module):
         return logits, caches
     
     # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
-    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
+    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
         self.eval()
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
+        input_ids = input_ids.repeat(batch_size, 1)
 
         # caches is a list of cache, one per layer
         # cache is composed of : the hidden state, and the last d_conv-1 inputs
         # the hidden state because the update is like an RNN
         # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
-        caches = [(None, torch.zeros(1, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
+        caches = [(None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
 
         for i in range(input_ids.size(1) + num_tokens - 1):
             with torch.no_grad():
                 # forward the new output, get new cache
-                next_token_logits, caches = self.step(input_ids[:, i], caches) # (1, vocab_size), caches
+                next_token_logits, caches = self.step(input_ids[:, i], caches) # (batch_size, vocab_size), caches
 
             # sample (no sampling when the prompt is being processed)
             if i+1 >= input_ids.size(1):
-                probs = F.softmax(next_token_logits / temperature, dim=-1) # (1, vocab_size)
+                probs = F.softmax(next_token_logits / temperature, dim=-1) # (batch_size, vocab_size)
 
                 if top_k is not None:
-                    values, _ = torch.topk(probs, k=top_k) # (1, k) ordered from lowest to biggest
+                    values, _ = torch.topk(probs, k=top_k) # (batch_size, k) ordered from lowest to biggest
                     probs[probs < values[:, -1, None]] = 0
                     probs = probs / probs.sum(axis=1, keepdims=True)
 
                 if sample:
-                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (1)
+                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (batch_size)
                 else:
-                    next_token = torch.argmax(probs, dim=-1) # (1)
+                    next_token = torch.argmax(probs, dim=-1) # (batch_size)
 
                 input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
                 
-        output = [tokenizer.decode(output.tolist()) for output in input_ids][0]
+        outputs = [tokenizer.decode(output.tolist()) for output in input_ids]
 
         self.train()
 
-        return output
+        if batch_size==1:
+            return outputs[0]
+        else:
+            return outputs
     
