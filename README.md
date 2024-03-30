@@ -36,7 +36,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 The most basic usage is to use the `Mamba` object ([mamba.py](mamba.py)), which implements a simple Mamba model given a configuration.
 No embedding, no head : input is `(B, L, D)` and output is `(B, L, D)` as well.
 
-```
+```python
 import torch
 from mamba import Mamba, MambaConfig
 
@@ -52,7 +52,7 @@ assert y.shape == x.shape
 
 The class `MambaLM` ([mamba_lm.py](mamba_lm.py)) builds on the `Mamba` object and offers a classic API for language models. It can be used as follows :
 
-```
+```python
 from mamba_lm import MambaLM, MambaLMConfig
 
 config = MambaLMConfig(d_model=16, n_layers=4, vocab_size=32000)
@@ -63,6 +63,17 @@ logits = model(x) # (B, L, vocab_size)
 ```
 
 It simply encapsulates a `Mamba` object with an embedding layer, a final normalization and a language modeling head.
+
+You can use it off the shelf with a pretrained Mamba model :
+```python
+from mamba_lm import from_pretrained
+from transformers import AutoTokenizer
+
+model = from_pretrained('state-spaces/mamba-130m').to("cuda")
+tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-neox-20b')
+
+output = model.generate(tokenizer, "Mamba is a type of")
+```
 
 ## Examples
 There are two basics examples available :
@@ -128,6 +139,7 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
+- Jamba ? inference and/or fine-tuning ?
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
 - ~~a step function, used for (auto-regressive) inference.~~
