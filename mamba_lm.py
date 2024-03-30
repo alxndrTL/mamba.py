@@ -126,9 +126,8 @@ class MambaLM(nn.Module):
 
         return logits, caches
     
-    # TODO temperature
     # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
-    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, sample: bool = True, top_k: int = 40):
+    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
         self.eval()
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
@@ -146,7 +145,7 @@ class MambaLM(nn.Module):
 
             # sample (no sampling when the prompt is being processed)
             if i+1 >= input_ids.size(1):
-                probs = F.softmax(next_token_logits, dim=-1) # (1, vocab_size)
+                probs = F.softmax(next_token_logits / temperature, dim=-1) # (1, vocab_size)
 
                 if top_k is not None:
                     values, _ = torch.topk(probs, k=top_k) # (1, k) ordered from lowest to biggest
