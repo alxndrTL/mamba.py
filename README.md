@@ -139,6 +139,7 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
+- plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
 - Jamba ? inference and/or fine-tuning ?
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
