@@ -42,8 +42,11 @@ class MambaConfig:
     dt_scale: float = 1.0
     dt_init_floor = 1e-4
 
+    rms_norm_eps: float = 1e-5
+
     bias: bool = False
     conv_bias: bool = True
+    inner_layernorms: bool = False # apply layernorms to internal activations
 
     pscan: bool = True # use parallel scan mode or sequential mode when training
 
@@ -60,7 +63,7 @@ class Mamba(nn.Module):
         self.config = config
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
-        #self.norm_f = RMSNorm(config.d_model)
+        #self.norm_f = RMSNorm(config.d_model, config.rms_norm_eps)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -91,7 +94,7 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.mixer = MambaBlock(config)
-        self.norm = RMSNorm(config.d_model)
+        self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -162,6 +165,24 @@ class MambaBlock(nn.Module):
         # projects block output from ED back to D
         self.out_proj = nn.Linear(config.d_inner, config.d_model, bias=config.bias)
 
+        if self.config.inner_layernorms:
+            self.dt_layernorm = RMSNorm(self.config.dt_rank, config.rms_norm_eps)
+            self.B_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
+            self.C_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
+        else:
+            self.dt_layernorm = None
+            self.B_layernorm = None
+            self.C_layernorm = None
+
+    def _apply_layernorms(self, dt, B, C):
+        if self.dt_layernorm is not None:
+            dt = self.dt_layernorm(dt)
+        if self.B_layernorm is not None:
+            B = self.B_layernorm(B)
+        if self.C_layernorm is not None:
+            C = self.C_layernorm(C)
+        return dt, B, C
+
     def forward(self, x):
         # x : (B, L, D)
         
@@ -200,6 +221,7 @@ class MambaBlock(nn.Module):
         deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
 
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
+        delta, B, C = self._apply_layernorms(delta, B, C)
         delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
 
         if self.config.pscan:
@@ -364,3 +386,4 @@ class RMSNorm(nn.Module):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.weight
 
         return output
+    
