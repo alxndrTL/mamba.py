@@ -1229,7 +1229,7 @@ class JambaAttentionDecoderLayer(nn.Module):
     def __init__(self, config: JambaConfig, num_experts: int, layer_idx: int):
         super().__init__()
 
-        self.self_attn = JAMBA_ATTENTION_CLASSES[config._attn_implementation](config, layer_idx)
+        self.self_attn = JambaSdpaAttention(config, layer_idx) #JAMBA_ATTENTION_CLASSES[config._attn_implementation](config, layer_idx)
 
         num_experts_per_tok = config.num_experts_per_tok if num_experts > 1 else 1
         self.moe = JambaSparseMoeBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
