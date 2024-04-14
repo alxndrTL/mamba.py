@@ -6,9 +6,6 @@ import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
-# todo : revoir le JambaModel (il y a l'embedding mais pas le final mdr)
-
-# todo : revoir le système de config, là pour l'instant c'est mal ordonné je pense
 # todo : script de conversion d'un pretrained
 
 # todo : une fois la numerical output achieved, on simplifiera à mort (quitte à changer un peu la structure aussi)
@@ -17,7 +14,7 @@ from mamba import MambaConfig, MambaBlock, RMSNorm
 # calcul du loss (avec le load_balancing)
 
 @dataclass
-class JambaConfig(MambaConfig):
+class JambaLMConfig(MambaConfig):
     
     mlp_size: int = 14336
 
@@ -53,7 +50,7 @@ class JambaConfig(MambaConfig):
     """
 
 class JambaLM(nn.Module):
-    def __init__(self, config: JambaConfig):
+    def __init__(self, config: JambaLMConfig):
         super().__init__()
 
         self.config = config
@@ -98,7 +95,7 @@ class JambaLM(nn.Module):
                 module.weight.data[module.padding_idx].zero_()
 
 class Jamba(nn.Module):
-    def __init__(self, config: JambaConfig):
+    def __init__(self, config: JambaLMConfig):
         super().__init__()
 
         self.config = config
@@ -140,7 +137,7 @@ class Jamba(nn.Module):
         return x
 
 class JambaAttentionDecoderLayer(nn.Module):
-    def __init__(self, config: JambaConfig, num_experts: int): #, layer_idx: int): # todo : caching
+    def __init__(self, config: JambaLMConfig, num_experts: int): #, layer_idx: int): # todo : caching
         super().__init__()
 
         self.self_attn = JambaSdpaAttention(config)
@@ -171,7 +168,7 @@ class JambaAttentionDecoderLayer(nn.Module):
         return outputs
 
 class JambaSdpaAttention(nn.Module):
-    def __init__(self, config: JambaConfig): #, layer_idx: Optional[int] = None): # todo : caching
+    def __init__(self, config: JambaLMConfig): #, layer_idx: Optional[int] = None): # todo : caching
         super().__init__()
 
         self.config = config
@@ -218,7 +215,7 @@ class JambaSdpaAttention(nn.Module):
         return attn_output
 
 class JambaMambaDecoderLayer(nn.Module):
-    def __init__(self, config: JambaConfig, num_experts: int):
+    def __init__(self, config: JambaLMConfig, num_experts: int):
         super().__init__()
 
         self.config = config
@@ -252,7 +249,7 @@ class JambaMambaDecoderLayer(nn.Module):
         return outputs
 
 class JambaSparseMoeBlock(nn.Module):
-    def __init__(self, config: JambaConfig, num_experts: int, num_experts_per_tok: int):
+    def __init__(self, config: JambaLMConfig, num_experts: int, num_experts_per_tok: int):
         super().__init__()
 
         self.hidden_dim = config.d_model
@@ -328,7 +325,7 @@ class JambaSparseMoeBlock(nn.Module):
         return final_hidden_states, router_logits
 
 class JambaMLP(nn.Module):
-    def __init__(self, config: JambaConfig):
+    def __init__(self, config: JambaLMConfig):
         super().__init__()
 
         self.hidden_dim = config.d_model
