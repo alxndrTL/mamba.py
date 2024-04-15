@@ -8,16 +8,11 @@ import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
-# todo : une fois la numerical output achieved, on simplifiera à mort (quitte à changer un peu la structure aussi)
-
 # todo : inférence !! avec caching évidemment !!
 
 # plus tard:
 # calcul du loss (avec le load_balancing)
 
-"""
-    
-"""
 
 @dataclass
 class JambaLMConfig:
@@ -25,7 +20,7 @@ class JambaLMConfig:
     d_model: int
     n_layers: int
     
-    mlp_size: int = 14336
+    mlp_size: int
     
     initializer_range: float = 0.02
     rms_norm_eps: float = 1e-5
@@ -137,21 +132,17 @@ class Jamba(nn.Module):
             num_experts = self.config.num_experts if is_expert else 1
 
             if is_attn:
-                decoder_layers.append(JambaAttentionDecoderLayer(config, num_experts=num_experts)) #, layer_idx=i))
+                decoder_layers.append(AttentionLayer(config, num_experts=num_experts)) #, layer_idx=i))
             else:
-                decoder_layers.append(JambaMambaDecoderLayer(config, num_experts=num_experts)) #, layer_idx=i))
+                decoder_layers.append(MambaLayer(config, num_experts=num_experts)) #, layer_idx=i))
 
-        if not any(isinstance(layer, JambaAttentionDecoderLayer) for layer in decoder_layers):
-            raise ValueError("At least one layer in the decoder must be an attention layer")        
-        self._attn_layer_index = [isinstance(layer, JambaAttentionDecoderLayer) for layer in decoder_layers].index(True)
-
-        if not any(isinstance(layer, JambaMambaDecoderLayer) for layer in decoder_layers):
-            raise ValueError("At least one layer in the decoder must be a Mamba layer")
-        self._mamba_layer_index = [isinstance(layer, JambaMambaDecoderLayer) for layer in decoder_layers].index(True)
+        # TODO : remove or not ? see after caching
+        self._attn_layer_index = [isinstance(layer, AttentionLayer) for layer in decoder_layers].index(True)
+        self._mamba_layer_index = [isinstance(layer, MambaLayer) for layer in decoder_layers].index(True)
 
         self.layers = nn.ModuleList(decoder_layers)
 
-        # you may want it to to init the weights in a particular manner if you don't use this jamba inside a JambaLM (see JambaLM)
+        # here you may want to init the weights in a particular manner if you don't use this jamba inside a JambaLM (see JambaLM)
 
     def forward(self, x, use_cache = None):
         # x: (B, L, D)
@@ -164,14 +155,14 @@ class Jamba(nn.Module):
 
         return x
 
-class JambaAttentionDecoderLayer(nn.Module):
+class AttentionLayer(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int): #, layer_idx: int): # todo : caching
         super().__init__()
 
-        self.self_attn = JambaSdpaAttention(config)
+        self.self_attn = AttentionSDPA(config)
 
         num_experts_per_tok = config.num_experts_per_tok if num_experts > 1 else 1
-        self.moe = JambaSparseMoeBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
+        self.moe = SparseMoEBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
         self.input_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
         self.pre_moe_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
 
@@ -195,7 +186,7 @@ class JambaAttentionDecoderLayer(nn.Module):
         outputs = (x, router_logits)
         return outputs
 
-class JambaSdpaAttention(nn.Module):
+class AttentionSDPA(nn.Module):
     def __init__(self, config: JambaLMConfig): #, layer_idx: Optional[int] = None): # todo : caching
         super().__init__()
 
@@ -242,7 +233,7 @@ class JambaSdpaAttention(nn.Module):
 
         return attn_output
 
-class JambaMambaDecoderLayer(nn.Module):
+class MambaLayer(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int):
         super().__init__()
 
@@ -251,7 +242,7 @@ class JambaMambaDecoderLayer(nn.Module):
         self.mamba = MambaBlock(config=config.mamba_config) #, layer_idx=layer_idx) TODO: caching
 
         num_experts_per_tok = config.num_experts_per_tok if num_experts > 1 else 1
-        self.moe = JambaSparseMoeBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
+        self.moe = SparseMoEBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
         self.input_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
         self.pre_moe_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
 
@@ -276,7 +267,7 @@ class JambaMambaDecoderLayer(nn.Module):
 
         return outputs
 
-class JambaSparseMoeBlock(nn.Module):
+class SparseMoEBlock(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int, num_experts_per_tok: int):
         super().__init__()
 
@@ -291,7 +282,7 @@ class JambaSparseMoeBlock(nn.Module):
         else:
             self.router = None
 
-        self.experts = nn.ModuleList([JambaMLP(config) for _ in range(self.num_experts)])
+        self.experts = nn.ModuleList([MLP(config) for _ in range(self.num_experts)])
 
     def forward(self, x):
         # x: (B, L, D)
@@ -352,7 +343,7 @@ class JambaSparseMoeBlock(nn.Module):
         
         return final_hidden_states, router_logits
 
-class JambaMLP(nn.Module):
+class MLP(nn.Module):
     def __init__(self, config: JambaLMConfig):
         super().__init__()
 
