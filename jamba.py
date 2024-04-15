@@ -1,4 +1,6 @@
-from dataclasses import dataclass, fields, asdict
+from dataclasses import dataclass
+from typing import Union
+import math
 
 import torch
 import torch.nn as nn
@@ -6,24 +8,48 @@ import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
-# todo : script de conversion d'un pretrained
-
 # todo : une fois la numerical output achieved, on simplifiera à mort (quitte à changer un peu la structure aussi)
+
+# todo : inférence !! avec caching évidemment !!
 
 # plus tard:
 # calcul du loss (avec le load_balancing)
 
+"""
+    
+"""
+
 @dataclass
-class JambaLMConfig(MambaConfig):
+class JambaLMConfig:
+    
+    d_model: int
+    n_layers: int
     
     mlp_size: int = 14336
+    
+    initializer_range: float = 0.02
+    rms_norm_eps: float = 1e-5
 
+    # mamba
+    d_state: int = 16 # N in paper
+    expand_factor: int = 2 # N in paper
+    d_conv: int = 4
+    dt_rank: Union[int, str] = 'auto'
+
+    dt_min: float = 0.001
+    dt_max: float = 0.1
+    dt_init: str = "random" # "random" or "constant"
+    dt_scale: float = 1.0
+    dt_init_floor = 1e-4
+    bias: bool = False
+    conv_bias: bool = True
+    inner_layernorms: bool = False
+    pscan: bool = True # use parallel scan mode or sequential mode when training
+
+    # attention
     num_attention_heads: int = 32
     num_key_value_heads: int = 8 # GQA
-
     attention_dropout: float = 0.
-
-    initializer_range: float = 0.02
 
     # MoE
     num_experts: int = 16
@@ -38,16 +64,17 @@ class JambaLMConfig(MambaConfig):
     # language modeling
     vocab_size: int = 65536
     pad_token_id: int = 0
+    tie_lm_weights: bool = True
 
     def __post_init__(self):
-        super().__post_init__()
+        self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
 
-    """
-    def to_mamba_config(self) -> MambaConfig:
-        mamba_config_fields = {field.name for field in fields(MambaConfig)}
-        filtered_dict = {k: v for k, v in asdict(self).items() if k in mamba_config_fields}
-        return MambaConfig(**filtered_dict)
-    """
+        if self.dt_rank == 'auto':
+            self.dt_rank = math.ceil(self.d_model / 16)
+
+        self.mamba_config = MambaConfig(self.d_model, 0, self.dt_rank, self.d_state, self.expand_factor,
+                                        self.d_conv, self.dt_min, self.dt_max, self.dt_init, self.dt_scale, self.rms_norm_eps,
+                                        self.bias, self.conv_bias, self.inner_layernorms, self.pscan)
 
 class JambaLM(nn.Module):
     def __init__(self, config: JambaLMConfig):
@@ -63,7 +90,8 @@ class JambaLM(nn.Module):
         self.final_layernorm = RMSNorm(config.d_model, config.rms_norm_eps)
 
         self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
-        # self.lm_head.weight = self.embedding.weight 
+        if self.config.tie_lm_weights:
+            self.lm_head.weight = self.embedding.weight 
 
         self.apply(self._init_weights)
 
@@ -220,7 +248,7 @@ class JambaMambaDecoderLayer(nn.Module):
 
         self.config = config
 
-        self.mamba = MambaBlock(config=config) #, layer_idx=layer_idx) TODO: caching
+        self.mamba = MambaBlock(config=config.mamba_config) #, layer_idx=layer_idx) TODO: caching
 
         num_experts_per_tok = config.num_experts_per_tok if num_experts > 1 else 1
         self.moe = JambaSparseMoeBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
