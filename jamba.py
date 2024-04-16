@@ -197,6 +197,9 @@ class AttentionLayer(nn.Module):
         outputs = (x, router_logits)
         return outputs, cache
 
+    def get_empty_cache(self, batch_size):
+        return (None, None)
+
 class AttentionSDPA(nn.Module):
     def __init__(self, config: JambaLMConfig): #, layer_idx: Optional[int] = None): # todo : caching
         super().__init__()
@@ -221,6 +224,8 @@ class AttentionSDPA(nn.Module):
 
         # attn_output: (B, L, D)
 
+        # todo : rename (virer le "states" et juste mettre queries, keys, values...)
+
         bsz, q_len, _ = x.size()
 
         query_states = self.q_proj(x)
@@ -230,6 +235,22 @@ class AttentionSDPA(nn.Module):
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        if cache is not None:
+            past_key_states, past_value_states = cache
+            
+            # first in the sequence
+            if past_key_states is not None:
+                key_states = torch.cat([past_key_states, key_states], dim=2)
+                value_states = torch.cat([past_value_states, value_states], dim=2)
+            
+            cache = (key_states, value_states)
+
+            #cache key = cat cache key + celle calculée
+            #cache value = cat cache value + celle calculée
+
+            #key_states = cache key
+            #value_states = cache value
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
