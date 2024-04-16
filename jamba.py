@@ -9,10 +9,9 @@ import torch.nn.functional as F
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
 # todo : inférence !! avec caching évidemment !!
+# todo : calcul du loss (avec le load_balancing)
 
-# plus tard:
-# calcul du loss (avec le load_balancing)
-
+# todo : sur le github, mettre un schéma de la structure de Jamba, et les parametres qui décident de quoi
 
 @dataclass
 class JambaLMConfig:
@@ -90,19 +89,19 @@ class JambaLM(nn.Module):
 
         self.apply(self._init_weights)
 
-    def forward(self, tokens):
+    def forward(self, tokens, caches = None):
         # tokens : (B, L)
 
         # logits : (B, L, vocab_size)
 
         x = self.embedding(tokens)
 
-        x = self.jamba(x)
+        x, caches = (self.jamba(x), None) if caches is None else self.jamba.step(x, caches)
         x = self.final_layernorm(x)
 
         logits = self.lm_head(x)
 
-        return logits
+        return logits, caches
     
     def _init_weights(self, module):
         std = self.config.initializer_range
@@ -137,23 +136,35 @@ class Jamba(nn.Module):
                 decoder_layers.append(MambaLayer(config, num_experts=num_experts)) #, layer_idx=i))
 
         # TODO : remove or not ? see after caching
-        self._attn_layer_index = [isinstance(layer, AttentionLayer) for layer in decoder_layers].index(True)
-        self._mamba_layer_index = [isinstance(layer, MambaLayer) for layer in decoder_layers].index(True)
+        #self._attn_layer_index = [isinstance(layer, AttentionLayer) for layer in decoder_layers].index(True)
+        #self._mamba_layer_index = [isinstance(layer, MambaLayer) for layer in decoder_layers].index(True)
 
         self.layers = nn.ModuleList(decoder_layers)
 
         # here you may want to init the weights in a particular manner if you don't use this jamba inside a JambaLM (see JambaLM)
 
-    def forward(self, x, use_cache = None):
+    def forward(self, x):
         # x: (B, L, D)
 
         # logits: (B, L, D)
 
         for decoder_layer in self.layers:
-            layer_outputs = decoder_layer(x, use_cache=use_cache)
-            x = layer_outputs[0]
+            layer_output, _ = decoder_layer(x)
+            x = layer_output[0]
 
         return x
+    
+    def step(self, x, caches):
+        # x: (B, L, D)
+
+        # logits: (B, L, D)
+        # caches
+
+        for i, decoder_layer in enumerate(self.layers):
+            layer_output, caches[i] = decoder_layer(x, caches[i])
+            x = layer_output[0]
+
+        return x, caches
 
 class AttentionLayer(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int): #, layer_idx: int): # todo : caching
@@ -166,7 +177,7 @@ class AttentionLayer(nn.Module):
         self.input_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
         self.pre_moe_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
 
-    def forward(self, x, use_cache = False):
+    def forward(self, x, cache = None):
         # x: (B, L, D)
 
         # outputs: (B, L, D)
@@ -174,7 +185,7 @@ class AttentionLayer(nn.Module):
         # attention
         residual = x
         x = self.input_layernorm(x)
-        x = self.self_attn(x)
+        x, cache = self.self_attn(x, cache)
         x = residual + x
 
         # FFN
@@ -184,7 +195,7 @@ class AttentionLayer(nn.Module):
         x = residual + x
 
         outputs = (x, router_logits)
-        return outputs
+        return outputs, cache
 
 class AttentionSDPA(nn.Module):
     def __init__(self, config: JambaLMConfig): #, layer_idx: Optional[int] = None): # todo : caching
@@ -205,7 +216,7 @@ class AttentionSDPA(nn.Module):
         self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
 
-    def forward(self, x): #, use_cache = False): todo : caching
+    def forward(self, x, cache = None): # todo : caching
         # x: (B, L, D)
 
         # attn_output: (B, L, D)
@@ -231,7 +242,7 @@ class AttentionSDPA(nn.Module):
 
         attn_output = self.o_proj(attn_output)
 
-        return attn_output
+        return attn_output, cache
 
 class MambaLayer(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int):
@@ -246,7 +257,7 @@ class MambaLayer(nn.Module):
         self.input_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
         self.pre_moe_layernorm = RMSNorm(config.d_model, eps=config.rms_norm_eps)
 
-    def forward(self, x, use_cache = False):
+    def forward(self, x, cache = None):
         # x: (B, L, D)
 
         # outputs: (B, L, D)
@@ -254,7 +265,11 @@ class MambaLayer(nn.Module):
         # mamba
         residual = x
         x = self.input_layernorm(x)
-        x = self.mamba(x)
+        if cache is None:
+            x = self.mamba(x)
+        else:
+            x, cache = self.mamba.step(x.squeeze(1), cache)
+            x = x.unsqueeze(1)
         x = residual + x
 
         # FFN
@@ -265,7 +280,7 @@ class MambaLayer(nn.Module):
 
         outputs = (x, router_logits)
 
-        return outputs
+        return outputs, cache
 
 class SparseMoEBlock(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int, num_experts_per_tok: int):
