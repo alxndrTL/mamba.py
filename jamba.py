@@ -281,6 +281,9 @@ class MambaLayer(nn.Module):
         outputs = (x, router_logits)
 
         return outputs, cache
+    
+    def get_empty_cache(self, batch_size):
+        return (None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1))
 
 class SparseMoEBlock(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int, num_experts_per_tok: int):
