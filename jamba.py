@@ -230,10 +230,6 @@ class Jamba(nn.Module):
             else:
                 decoder_layers.append(MambaLayer(config, num_experts=num_experts)) #, layer_idx=i))
 
-        # TODO : remove or not ? see after caching
-        #self._attn_layer_index = [isinstance(layer, AttentionLayer) for layer in decoder_layers].index(True)
-        #self._mamba_layer_index = [isinstance(layer, MambaLayer) for layer in decoder_layers].index(True)
-
         self.layers = nn.ModuleList(decoder_layers)
 
         # here you may want to init the weights in a particular manner if you don't use this jamba inside a JambaLM (see JambaLM)
@@ -243,11 +239,14 @@ class Jamba(nn.Module):
 
         # logits: (B, L, D)
 
+        router_logits = []
+
         for decoder_layer in self.layers:
             layer_output, _ = decoder_layer(x)
             x = layer_output[0]
+            router_logits.append(layer_output[1])
 
-        return x
+        return x, router_logits
     
     def step(self, x, caches):
         # x: (B, L, D)
@@ -426,7 +425,9 @@ class SparseMoEBlock(nn.Module):
         # x: (B, L, D)
 
         # final_hidden_states: (B, L, D)
-        # router_logits: TODO
+        # router_logits: (B*L, n_experts)
+
+        #todo : pq B*L ? ça parait bizarre
         
         batch_size, sequence_length, hidden_dim = x.shape
 
@@ -442,10 +443,9 @@ class SparseMoEBlock(nn.Module):
             return final_hidden_states, router_logits
 
         # routing
-        x = x.view(-1, hidden_dim)
+        x = x.view(-1, hidden_dim) # (B*L, D)
 
-        # router_logits: (batch * sequence_length, n_experts)
-        router_logits = self.router(x)
+        router_logits = self.router(x) # (B*L, n_experts)
         routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
         routing_weights, selected_experts = torch.topk(routing_weights, self.top_k, dim=-1)
         routing_weights = routing_weights.to(x.dtype)
@@ -498,6 +498,26 @@ class MLP(nn.Module):
         # y : (B, L, D)
 
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+    
+def load_balancing_loss(router_logits, num_experts, num_experts_per_tok):
+    # router_logits: list of router_logit, one per layer, each (B*D, n_experts)
+
+    # moe_aux_loss : scalar
+
+    router_logits = torch.cat(router_logits, dim=0)
+
+    routing_weights = torch.nn.functional.softmax(router_logits, dim=-1)
+    _, selected_experts = torch.topk(routing_weights, num_experts_per_tok, dim=-1)
+    expert_mask = torch.nn.functional.one_hot(selected_experts, num_experts)
+
+    # percentage of tokens routed to each experts
+    tokens_per_expert = torch.mean(expert_mask.float(), dim=0)
+
+    # average probability of routing to these experts
+    router_prob_per_expert = torch.mean(routing_weights, dim=0)
+
+    moe_aux_loss = torch.sum(tokens_per_expert * router_prob_per_expert.unsqueeze(0))
+    return moe_aux_loss * num_experts
 
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
