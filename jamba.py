@@ -225,6 +225,7 @@ class AttentionSDPA(nn.Module):
         # attn_output: (B, L, D)
 
         # todo : rename (virer le "states" et juste mettre queries, keys, values...)
+        # todo : rename aussi le bsz et le q_len
 
         bsz, q_len, _ = x.size()
 
@@ -246,18 +247,21 @@ class AttentionSDPA(nn.Module):
             
             cache = (key_states, value_states)
 
-            #cache key = cat cache key + celle calculée
-            #cache value = cat cache value + celle calculée
-
-            #key_states = cache key
-            #value_states = cache value
+        #print(f"key states to be used : {key_states}")
+        #print(f"value states to be used : {value_states}")
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+        #print("----")
+        #print(query_states.shape)
+        #print(key_states.shape)
+        #print(value_states.shape)
+        #print("-----")
+
         attn_output = torch.nn.functional.scaled_dot_product_attention(query_states, key_states, value_states,
                                                                        dropout_p=self.attention_dropout if self.training else 0.0,
-                                                                       is_causal=True)
+                                                                       is_causal=(cache is None))
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.view(bsz, q_len, self.hidden_size)
 

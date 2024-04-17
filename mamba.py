@@ -355,6 +355,7 @@ class MambaBlock(nn.Module):
         deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
 
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, dt_rank), (B, N), (B, N)
+        delta, B, C = self._apply_layernorms(delta, B, C)
         delta = F.softplus(self.dt_proj(delta)) # (B, ED)
 
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, ED, N)
