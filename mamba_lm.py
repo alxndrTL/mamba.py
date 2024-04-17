@@ -19,7 +19,7 @@ Encapsulates a Mamba model as language model. It has an embedding layer, and a L
 @dataclass
 class MambaLMConfig(MambaConfig):
     vocab_size: int = 32000
-    pad_vocab_size_multiple: int = 8
+    pad_vocab_size_multiple: int = 16
 
     def __post_init__(self):
         super().__post_init__()
