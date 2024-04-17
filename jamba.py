@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from typing import Union
 import math
 
@@ -70,6 +71,57 @@ class JambaLMConfig:
                                         self.d_conv, self.dt_min, self.dt_max, self.dt_init, self.dt_scale, self.rms_norm_eps,
                                         self.bias, self.conv_bias, self.inner_layernorms, self.pscan)
 
+def from_pretrained(name: str):
+    """
+    Returns a model loaded with pretrained weights pulled from HuggingFace.
+    The model has to follow the same structure as the original Jamba model on HF (ai21labs/Jamba-v0.1).
+    You can easily adapt this function.
+
+    Args:
+        name: for example:
+            * 'TechxGenus/Mini-Jamba'
+            * 'ai21labs/Jamba-v0.1'
+
+    Returns:
+        model: a Jamba model configured with the proper parameters and initialized with the proper weights
+    """
+
+    from transformers import AutoModelForCausalLM
+
+    model_hf = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.float16, use_mamba_kernels=False, device_map="auto", trust_remote_code=True)
+        
+    # copy config data
+    config = JambaLMConfig(vocab_size=model_hf.config.vocab_size, d_model=model_hf.config.hidden_size, n_layers=model_hf.config.num_hidden_layers, 
+                                rms_norm_eps=model_hf.config.rms_norm_eps, mlp_size=model_hf.config.intermediate_size, inner_layernorms=model_hf.config.mamba_inner_layernorms,
+                                expand_factor=model_hf.config.mamba_expand, dt_rank=model_hf.config.mamba_dt_rank, d_state=model_hf.config.mamba_d_state,
+                                d_conv=model_hf.config.mamba_d_conv, conv_bias=model_hf.config.mamba_conv_bias, initializer_range=model_hf.config.initializer_range,
+                                num_experts=model_hf.config.num_experts, num_experts_per_tok=model_hf.config.num_experts_per_tok, 
+                                attn_layer_offset=model_hf.config.attn_layer_offset, attn_layer_period=model_hf.config.attn_layer_period, 
+                                expert_layer_offset=model_hf.config.expert_layer_offset, expert_layer_period=model_hf.config.expert_layer_period,
+                                num_key_value_heads=model_hf.config.num_key_value_heads, num_attention_heads=model_hf.config.num_attention_heads,
+                                pad_token_id=model_hf.config.pad_token_id, bias=model_hf.config.mamba_proj_bias, attention_dropout=model_hf.config.attention_dropout,
+                                tie_lm_weights=model_hf.config.tie_word_embeddings)
+
+    model = JambaLM(config)
+
+    # copy weights
+    for name, param in model_hf.named_parameters():
+        name = name.replace("model.", "jamba.")
+        
+        if "embed_tokens" in name:
+            name = "embedding.weight"
+        
+        if "final_layernorm" in name:
+            name = name.replace("jamba.", "")
+
+        counterpart_param = model.get_parameter(name)
+        if counterpart_param is not None:
+            counterpart_param.data.copy_(param.data)
+
+    del model_hf
+
+    return model
+
 class JambaLM(nn.Module):
     def __init__(self, config: JambaLMConfig):
         super().__init__()
@@ -102,6 +154,49 @@ class JambaLM(nn.Module):
         logits = self.lm_head(x)
 
         return logits, caches
+
+    # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
+    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
+        self.eval()
+
+        input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
+        input_ids = input_ids.repeat(batch_size, 1)
+
+        # caches is a list of cache, one per layer
+        # cache is composed of : - if Mamba layer : the hidden state, and the last d_conv-1 inputs
+        #                        - if Attention layer : the KV cache
+        caches = [self.jamba.layers[i].get_empty_cache(batch_size) for i in range(self.config.n_layers)]
+
+        for i in range(input_ids.size(1) + num_tokens - 1):
+            with torch.no_grad():
+                # forward the new output, get new cache
+                next_token_logits, caches = self(input_ids[:, [i]], caches) # (batch_size, 1, vocab_size), caches
+                next_token_logits = next_token_logits.squeeze(1)
+
+            # sample (no sampling when the prompt is being processed)
+            if i+1 >= input_ids.size(1):
+                probs = F.softmax(next_token_logits / temperature, dim=-1) # (batch_size, vocab_size)
+
+                if top_k is not None:
+                    values, _ = torch.topk(probs, k=top_k) # (batch_size, k) ordered from lowest to biggest
+                    probs[probs < values[:, -1, None]] = 0
+                    probs = probs / probs.sum(axis=1, keepdims=True)
+
+                if sample:
+                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (batch_size)
+                else:
+                    next_token = torch.argmax(probs, dim=-1) # (batch_size)
+
+                input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
+                    
+        outputs = [tokenizer.decode(output.tolist()) for output in input_ids[:, 1:]]
+
+        self.train()
+
+        if batch_size==1:
+            return outputs[0]
+        else:
+            return outputs
     
     def _init_weights(self, module):
         std = self.config.initializer_range
