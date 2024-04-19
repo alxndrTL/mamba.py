@@ -20,7 +20,7 @@ class JambaLMConfig:
     initializer_range: float = 0.02
     rms_norm_eps: float = 1e-5
 
-    # mamba
+    # mamba related
     d_state: int = 16 # N in paper
     expand_factor: int = 2 # N in paper
     d_conv: int = 4
@@ -36,12 +36,12 @@ class JambaLMConfig:
     inner_layernorms: bool = False
     pscan: bool = True # use parallel scan mode or sequential mode when training
 
-    # attention
+    # attention related
     num_attention_heads: int = 32
     num_key_value_heads: int = 8 # GQA
     attention_dropout: float = 0.
 
-    # MoE
+    # MoE related
     num_experts: int = 16
     num_experts_per_tok: int = 2
 
@@ -168,7 +168,7 @@ class JambaLM(nn.Module):
         return logits, caches
 
     # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
-    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
+    def generate(self, tokenizer, prompt: str, max_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
         self.eval()
 
         input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
@@ -179,10 +179,10 @@ class JambaLM(nn.Module):
         #                        - if Attention layer : the KV cache, ie 2 tensors of shape (B, num_kv_heads, L, head_dim)
         caches = [self.jamba.layers[i].get_empty_cache(batch_size) for i in range(self.config.n_layers)]
 
-        for i in range(input_ids.size(1) + num_tokens - 1):
+        for i in range(input_ids.size(1) + max_tokens - 1):
             with torch.no_grad():
                 # forward the new output, get new cache
-                next_token_logits, caches = self(input_ids[:, [i]], caches) # (batch_size, 1, vocab_size), caches
+                next_token_logits, caches = self.step(input_ids[:, [i]], caches) # (batch_size, 1, vocab_size), caches
                 next_token_logits = next_token_logits.squeeze(1)
 
             # sample (no sampling when the prompt is being processed)
@@ -200,13 +200,16 @@ class JambaLM(nn.Module):
                     next_token = torch.argmax(probs, dim=-1) # (batch_size)
 
                 input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
-                    
-        outputs = [tokenizer.decode(output.tolist()) for output in input_ids[:, 1:]]
+
+                if next_token.item() == tokenizer.eos_token_id:
+                    break
+
+        outputs = [tokenizer.decode(output.tolist(), skip_special_tokens=True) for output in input_ids[:, 1:]]
 
         self.train()
 
         if batch_size==1:
-            return outputs[0]
+            return outputs[0], input_ids.shape[1] # todo : remove
         else:
             return outputs
     
