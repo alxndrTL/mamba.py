@@ -9,10 +9,6 @@ import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
-# todo : le forward du JambaLM, on renvoit logits et router_logits... un peu bizarre non ? sinon on peut imaginer un calcul du loss direct
-
-# todo : sur le github, mettre un schéma de la structure de Jamba, et les parametres qui décident de quoi
-
 @dataclass
 class JambaLMConfig:
     
