@@ -12,6 +12,8 @@ from mamba import MambaConfig, MambaBlock, RMSNorm
 # todo : inférence !! avec caching évidemment !!
 # todo : calcul du loss (avec le load_balancing)
 
+# todo : le forward du JambaLM, on renvoit logits et router_logits... un peu bizarre non ? sinon on peut imaginer un calcul du loss direct
+
 # todo : sur le github, mettre un schéma de la structure de Jamba, et les parametres qui décident de quoi
 
 @dataclass
@@ -88,7 +90,7 @@ def from_pretrained(name: str):
 
     from transformers import AutoModelForCausalLM
 
-    model_hf = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.float16, use_mamba_kernels=False, device_map="auto", trust_remote_code=True)
+    model_hf = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.float32, use_mamba_kernels=False, device_map="auto", trust_remote_code=True)
         
     # copy config data
     config = JambaLMConfig(vocab_size=model_hf.config.vocab_size, d_model=model_hf.config.hidden_size, n_layers=model_hf.config.num_hidden_layers, 
@@ -141,14 +143,28 @@ class JambaLM(nn.Module):
 
         self.apply(self._init_weights)
 
-    def forward(self, tokens, caches = None):
+    def forward(self, tokens):
         # tokens : (B, L)
 
         # logits : (B, L, vocab_size)
 
         x = self.embedding(tokens)
 
-        x, caches = (self.jamba(x), None) if caches is None else self.jamba.step(x, caches)
+        x, router_logits = self.jamba(x)
+        x = self.final_layernorm(x)
+
+        logits = self.lm_head(x)
+
+        return logits, router_logits
+    
+    def step(self, tokens, caches):
+        # tokens : (B, L)
+
+        # logits : (B, L, vocab_size)
+
+        x = self.embedding(tokens)
+
+        x, caches = self.jamba.step(x, caches)
         x = self.final_layernorm(x)
 
         logits = self.lm_head(x)
@@ -504,7 +520,7 @@ def load_balancing_loss(router_logits, num_experts, num_experts_per_tok):
 
     # moe_aux_loss : scalar
 
-    router_logits = torch.cat(router_logits, dim=0)
+    router_logits = torch.cat([r for r in router_logits if r.shape[1] > 1], dim=0)
 
     routing_weights = torch.nn.functional.softmax(router_logits, dim=-1)
     _, selected_experts = torch.topk(routing_weights, num_experts_per_tok, dim=-1)
