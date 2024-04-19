@@ -177,7 +177,7 @@ class JambaLM(nn.Module):
         # caches is a list of cache, one per layer
         # cache is composed of : - if Mamba layer : the hidden state, and the last d_conv-1 inputs (see more in mamba_lm.py)
         #                        - if Attention layer : the KV cache, ie 2 tensors of shape (B, num_kv_heads, L, head_dim)
-        caches = [self.jamba.layers[i].get_empty_cache(batch_size) for i in range(self.config.n_layers)]
+        caches = [self.jamba.layers[i].get_empty_cache(batch_size, input_ids.device) for i in range(self.config.n_layers)]
 
         for i in range(input_ids.size(1) + max_tokens - 1):
             with torch.no_grad():
@@ -306,7 +306,7 @@ class AttentionLayer(nn.Module):
         outputs = (x, router_logits)
         return outputs, cache
 
-    def get_empty_cache(self, batch_size):
+    def get_empty_cache(self, batch_size, device):
         return (None, None)
 
 class AttentionSDPA(nn.Module):
@@ -405,8 +405,8 @@ class MambaLayer(nn.Module):
 
         return outputs, cache
     
-    def get_empty_cache(self, batch_size):
-        return (None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1))
+    def get_empty_cache(self, batch_size, device):
+        return (None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1, device=device))
 
 class SparseMoEBlock(nn.Module):
     def __init__(self, config: JambaLMConfig, num_experts: int, num_experts_per_tok: int):

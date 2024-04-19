@@ -1,5 +1,5 @@
 # load jamba from HF
-# inference w/ 50 tokens
+# inference
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -13,13 +13,19 @@ tokenizer = AutoTokenizer.from_pretrained(
     trust_remote_code=True,
 )
 tokenizer.pad_token = tokenizer.eos_token
+
+print("tokenizer loaded")
+
 model = AutoModelForCausalLM.from_pretrained(
     "TechxGenus/Mini-Jamba",
     torch_dtype=torch.float16,
-    device_map="auto",
+    device_map="auto", # cuda
     trust_remote_code=True,
     use_mamba_kernels=False
 )
+
+print("model loaded")
+
 inputs = tokenizer.encode(prompt, return_tensors="pt")
 
 st = time.time()

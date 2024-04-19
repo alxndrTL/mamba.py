@@ -1,5 +1,5 @@
-# load jamba from HF
-# inference w/ 50 tokens
+# load jamba
+# inference
 
 import torch
 from jamba import from_pretrained
@@ -15,7 +15,7 @@ tokenizer = AutoTokenizer.from_pretrained(
 )
 tokenizer.pad_token = tokenizer.eos_token
 
-model = from_pretrained("TechxGenus/Mini-Jamba")
+model = from_pretrained("TechxGenus/Mini-Jamba")#.to("cuda")
 
 st = time.time()
 outputs, count = model.generate(tokenizer, prompt, max_tokens=188, sample=False, top_k=40)
