@@ -148,7 +148,10 @@ class JambaLM(nn.Module):
 
         logits = self.lm_head(x)
 
-        return logits, router_logits
+        if self.config.num_experts == 1:
+            return logits
+        else:
+            return logits, router_logits
     
     def step(self, tokens, caches):
         # tokens : (B, L)
