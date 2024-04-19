@@ -6,8 +6,6 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 import time
 
-prompt = "def min(arr):"
-
 tokenizer = AutoTokenizer.from_pretrained("ai21labs/Jamba-v0.1")
 
 print("tokenizer loaded")
