@@ -9,9 +9,6 @@ import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
 
-# todo : inférence !! avec caching évidemment !!
-# todo : calcul du loss (avec le load_balancing)
-
 # todo : le forward du JambaLM, on renvoit logits et router_logits... un peu bizarre non ? sinon on peut imaginer un calcul du loss direct
 
 # todo : sur le github, mettre un schéma de la structure de Jamba, et les parametres qui décident de quoi
@@ -179,8 +176,8 @@ class JambaLM(nn.Module):
         input_ids = input_ids.repeat(batch_size, 1)
 
         # caches is a list of cache, one per layer
-        # cache is composed of : - if Mamba layer : the hidden state, and the last d_conv-1 inputs
-        #                        - if Attention layer : the KV cache
+        # cache is composed of : - if Mamba layer : the hidden state, and the last d_conv-1 inputs (see more in mamba_lm.py)
+        #                        - if Attention layer : the KV cache, ie 2 tensors of shape (B, num_kv_heads, L, head_dim)
         caches = [self.jamba.layers[i].get_empty_cache(batch_size) for i in range(self.config.n_layers)]
 
         for i in range(input_ids.size(1) + num_tokens - 1):
@@ -242,9 +239,9 @@ class Jamba(nn.Module):
             num_experts = self.config.num_experts if is_expert else 1
 
             if is_attn:
-                decoder_layers.append(AttentionLayer(config, num_experts=num_experts)) #, layer_idx=i))
+                decoder_layers.append(AttentionLayer(config, num_experts=num_experts))
             else:
-                decoder_layers.append(MambaLayer(config, num_experts=num_experts)) #, layer_idx=i))
+                decoder_layers.append(MambaLayer(config, num_experts=num_experts))
 
         self.layers = nn.ModuleList(decoder_layers)
 
@@ -277,7 +274,7 @@ class Jamba(nn.Module):
         return x, caches
 
 class AttentionLayer(nn.Module):
-    def __init__(self, config: JambaLMConfig, num_experts: int): #, layer_idx: int): # todo : caching
+    def __init__(self, config: JambaLMConfig, num_experts: int):
         super().__init__()
 
         self.self_attn = AttentionSDPA(config)
@@ -311,11 +308,10 @@ class AttentionLayer(nn.Module):
         return (None, None)
 
 class AttentionSDPA(nn.Module):
-    def __init__(self, config: JambaLMConfig): #, layer_idx: Optional[int] = None): # todo : caching
+    def __init__(self, config: JambaLMConfig):
         super().__init__()
 
         self.config = config
-        #self.layer_idx = layer_idx
 
         self.hidden_size = config.d_model
         self.num_heads = config.num_attention_heads
@@ -329,51 +325,41 @@ class AttentionSDPA(nn.Module):
         self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
 
-    def forward(self, x, cache = None): # todo : caching
+    def forward(self, x, cache = None):
         # x: (B, L, D)
 
         # attn_output: (B, L, D)
 
-        # todo : rename (virer le "states" et juste mettre queries, keys, values...)
-        # todo : rename aussi le bsz et le q_len
+        B, L, _ = x.size()
 
-        bsz, q_len, _ = x.size()
+        queries = self.q_proj(x)
+        keys = self.k_proj(x)
+        values = self.v_proj(x)
 
-        query_states = self.q_proj(x)
-        key_states = self.k_proj(x)
-        value_states = self.v_proj(x)
+        queries = queries.view(B, L, self.num_heads, self.head_dim).transpose(1, 2)
+        keys = keys.view(B, L, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        values = values.view(B, L, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
-        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-
+        # kv cache implementation
         if cache is not None:
-            past_key_states, past_value_states = cache
+            past_keys, past_values = cache
             
-            # first in the sequence
-            if past_key_states is not None:
-                key_states = torch.cat([past_key_states, key_states], dim=2)
-                value_states = torch.cat([past_value_states, value_states], dim=2)
+            # not first in the sequence
+            if past_keys is not None:
+                keys = torch.cat([past_keys, keys], dim=2)
+                values = torch.cat([past_values, values], dim=2)
             
-            cache = (key_states, value_states)
+            cache = (keys, values) # prepare cache for next token
 
-        #print(f"key states to be used : {key_states}")
-        #print(f"value states to be used : {value_states}")
+        # GQA related
+        keys = repeat_kv(keys, self.num_key_value_groups)
+        values = repeat_kv(values, self.num_key_value_groups)
 
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-        #print("----")
-        #print(query_states.shape)
-        #print(key_states.shape)
-        #print(value_states.shape)
-        #print("-----")
-
-        attn_output = torch.nn.functional.scaled_dot_product_attention(query_states, key_states, value_states,
+        attn_output = torch.nn.functional.scaled_dot_product_attention(queries, keys, values,
                                                                        dropout_p=self.attention_dropout if self.training else 0.0,
                                                                        is_causal=(cache is None))
         attn_output = attn_output.transpose(1, 2).contiguous()
-        attn_output = attn_output.view(bsz, q_len, self.hidden_size)
+        attn_output = attn_output.view(B, L, self.hidden_size)
 
         attn_output = self.o_proj(attn_output)
 
@@ -385,7 +371,7 @@ class MambaLayer(nn.Module):
 
         self.config = config
 
-        self.mamba = MambaBlock(config=config.mamba_config) #, layer_idx=layer_idx) TODO: caching
+        self.mamba = MambaBlock(config=config.mamba_config)
 
         num_experts_per_tok = config.num_experts_per_tok if num_experts > 1 else 1
         self.moe = SparseMoEBlock(config, num_experts=num_experts, num_experts_per_tok=num_experts_per_tok)
@@ -443,7 +429,8 @@ class SparseMoEBlock(nn.Module):
         # final_hidden_states: (B, L, D)
         # router_logits: (B*L, n_experts)
 
-        #todo : pq B*L ? ça parait bizarre
+        #note : it is not clear why we work with shape (B*L, D) here.
+        #I copied this code from the official jamba imple, and did not have time to think it through.
         
         batch_size, sequence_length, hidden_dim = x.shape
 
