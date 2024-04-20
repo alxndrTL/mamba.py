@@ -27,6 +27,8 @@ See Figure 3 of the paper (page 8) for a visual representation of a MambaBlock.
 
 """
 
+# todo : rename dt
+
 @dataclass
 class MambaConfig:
     d_model: int # D
@@ -49,6 +51,7 @@ class MambaConfig:
     inner_layernorms: bool = False # apply layernorms to internal activations
 
     pscan: bool = True # use parallel scan mode or sequential mode when training
+    use_cuda: bool = False # use official CUDA implementation when training
 
     def __post_init__(self):
         self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
@@ -63,7 +66,6 @@ class Mamba(nn.Module):
         self.config = config
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
-        #self.norm_f = RMSNorm(config.d_model, config.rms_norm_eps)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -160,6 +162,7 @@ class MambaBlock(nn.Module):
         # S4D real initialization
         A = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
         self.A_log = nn.Parameter(torch.log(A)) # why store A in log ? to keep A < 0 (cf -torch.exp(...)) ? for gradient stability ?
+        #todo : self.A_log._no_weight_decay = True has been added in the official Mamba implementation
         self.D = nn.Parameter(torch.ones(config.d_inner))
 
         # projects block output from ED back to D
@@ -173,6 +176,10 @@ class MambaBlock(nn.Module):
             self.dt_layernorm = None
             self.B_layernorm = None
             self.C_layernorm = None
+
+        if self.config.use_cuda:
+            from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
+            self.selective_scan_cuda = selective_scan_fn
 
     def _apply_layernorms(self, dt, B, C):
         if self.dt_layernorm is not None:
@@ -208,6 +215,47 @@ class MambaBlock(nn.Module):
         output = self.out_proj(output) # (B, L, D)
 
         return output
+
+    #todo : merge ce forward avec le forward normal???
+    #todo : inner layer norms
+    def foward_cuda(self, x):
+        # x : (B, L, ED)
+
+        # y : (B, L, ED)
+
+        _, L, _ = x.shape
+
+        xz = self.in_proj(x) # (B, L, 2*ED)
+        x, z = xz.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
+
+        # x branch
+        x = x.transpose(1, 2) # (B, ED, L)
+        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
+        x = x.transpose(1, 2) # (B, L, ED)
+
+        x = F.silu(x)
+
+        A = -torch.exp(self.A_log.float()) # (ED, N)
+        D = self.D.float()
+        # TODO remove .float()
+
+        deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
+        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
+        delta, B, C = self._apply_layernorms(delta, B, C)
+        delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
+
+        x = x.transpose(1, 2)
+        delta = delta.transpose(1, 2)
+        B = B.transpose(1, 2)
+        C = C.transpose(1, 2)
+        z = z.transpose(1, 2)
+
+        #y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_bias=self.dt_proj.bias.float(), delta_softplus=True, return_last_state=False)
+        y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, return_last_state=False)
+        y = y.transpose(1, 2)
+
+        output = self.out_proj(y)
+        return output
     
     def ssm(self, x):
         # x : (B, L, ED)
@@ -219,7 +267,6 @@ class MambaBlock(nn.Module):
         # TODO remove .float()
 
         deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
-
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
         delta, B, C = self._apply_layernorms(delta, B, C)
         delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
