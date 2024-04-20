@@ -27,6 +27,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
 - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
+- `jamba.py` : a clean implementation of the Jamba model in PyTorch
 - `📁 mlx` : basically the same code as above, but in MLX.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch.
@@ -78,7 +79,20 @@ output = model.generate(tokenizer, "Mamba is a type of")
 This is the structure of the `mamba.py` modules:
 
 <p align="center">
-    <img src="assets/mamba_structure.jpg" alt="a python and a mamba" width="737" height="429" alt="mamba structure"/>
+    <img src="assets/mamba_structure.jpg" width="737" height="429" alt="mamba structure"/>
+</p>
+
+## Jamba
+You can also train and run inference on Jamba models. Take a look at the `jamba.py` file, which constructs a `Jamba` object, which interleaves Mamba layers (from `mamba.py`) with attention layers.
+
+This is the structure of the modules  found in `jamba.py` :
+
+<p align="center">
+    <img src="assets/jamba_structure.jpg" width="612" height="357" alt="mamba structure"/>
+</p>
+
+<p align="center">
+    <img src="assets/jamba_modules.jpg" width="422" height="240" alt="mamba structure"/>
 </p>
 
 ## Examples
@@ -87,6 +101,19 @@ There are two basics examples available :
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
 If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
+
+The API is the same as with the `Mamba` and `MambaLM` models.
+You can load a pretrained Jamba model like so :
+
+```python
+from jamba_lm import from_pretrained
+from transformers import AutoTokenizer
+
+model = from_pretrained('TechxGenus/Mini-Jamba').to("cuda")
+tokenizer = AutoTokenizer.from_pretrained('TechxGenus/Mini-Jamba')
+
+output = model.generate(tokenizer, "def min(arr):")
+```
 
 ___
 ## Performances
