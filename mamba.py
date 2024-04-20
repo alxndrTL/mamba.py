@@ -219,88 +219,6 @@ class MambaBlock(nn.Module):
         output = self.out_proj(output) # (B, L, D)
 
         return output
-
-    #todo : merge ce forward avec le forward normal???
-    #todo : inner layer norms
-    def foward_cuda(self, x):
-        # x : (B, L, ED)
-
-        # y : (B, L, ED)
-
-        _, L, _ = x.shape
-
-        xz = self.in_proj(x) # (B, L, 2*ED)
-        x, z = xz.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
-
-        # x branch
-        x = x.transpose(1, 2) # (B, ED, L)
-        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
-        x = x.transpose(1, 2) # (B, L, ED)
-
-        x = F.silu(x)
-
-        A = -torch.exp(self.A_log.float()) # (ED, N)
-        D = self.D.float()
-        # TODO remove .float()
-
-        deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
-        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
-        delta, B, C = self._apply_layernorms(delta, B, C)
-        delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
-
-        x = x.transpose(1, 2)
-        delta = delta.transpose(1, 2)
-        B = B.transpose(1, 2)
-        C = C.transpose(1, 2)
-        #z = z.transpose(1, 2)
-
-        #y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_bias=self.dt_proj.bias.float(), delta_softplus=True, return_last_state=False)
-        y = self.selective_scan_cuda(x, delta, A, B, C, D)#, z=z, return_last_state=False)
-        y = y.transpose(1, 2)
-
-        z = F.silu(z)
-        output = y * z
-        output = self.out_proj(output) # (B, L, D)
-
-        #output = self.out_proj(y)
-        return output
-    
-    def foward_cuda_fast(self, x):
-        # x : (B, L, ED)
-
-        # y : (B, L, ED)
-
-        _, L, _ = x.shape
-
-        xz = self.in_proj(x) # (B, L, 2*ED)
-        x, z = xz.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
-
-        # x branch
-        x = x.transpose(1, 2) # (B, ED, L)
-        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
-        x = x.transpose(1, 2) # (B, L, ED)
-
-        x = F.silu(x)
-
-        A = -torch.exp(self.A_log.float()) # (ED, N)
-        D = self.D.float()
-        # TODO remove .float()
-
-        deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
-        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
-        delta, B, C = self._apply_layernorms(delta, B, C)
-        delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
-
-        x = x.transpose(1, 2)
-        B = B.transpose(1, 2)
-        C = C.transpose(1, 2)
-        z = z.transpose(1, 2)
-
-        y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=self.dt_proj.bias.float())
-        y = y.transpose(1, 2) # (B, L, ED)
-
-        output = self.out_proj(y) # (B, L, D)
-        return output
     
     def ssm(self, x, z):
         # x : (B, L, ED)
@@ -309,13 +227,11 @@ class MambaBlock(nn.Module):
 
         A = -torch.exp(self.A_log.float()) # (ED, N)
         D = self.D.float()
-        # TODO remove .float()
 
         deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
         delta, B, C = self._apply_layernorms(delta, B, C)
         delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
-        #delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
         
         if self.config.use_cuda:
             x = x.transpose(1, 2)
@@ -329,7 +245,7 @@ class MambaBlock(nn.Module):
         else:
             delta = delta.transpose(1, 2)
             delta = F.softplus(delta + self.dt_proj.bias)
-            
+
             if self.config.pscan:
                 y = self.selective_scan(x, delta, A, B, C, D)
             else:
@@ -456,7 +372,6 @@ class MambaBlock(nn.Module):
 
         A = -torch.exp(self.A_log.float()) # (ED, N) # todo : ne pas le faire tout le temps, puisque c'est indépendant de la timestep
         D = self.D.float()
-        # TODO remove .float()
 
         deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
 
@@ -478,7 +393,7 @@ class MambaBlock(nn.Module):
 
         y = y + D * x
 
-        # todo : pq h.squeeze(1) ??
+        # todo
         return y, h.squeeze(1)
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
