@@ -15,8 +15,9 @@ The major differences are :
 -the convolution is done with torch.nn.Conv1d
 -the selective scan is done in PyTorch
 
-A sequential version of the selective scan is also available for comparison.
+A sequential version of the selective scan is also available for comparison. Also, it is possible to use the official Mamba implementation.
 
+This is the structure of the torch modules :
 - A Mamba model is composed of several layers, which are ResidualBlock.
 - A ResidualBlock is composed of a MambaBlock, a normalization, and a residual connection : ResidualBlock(x) = mamba(norm(x)) + x
 - This leaves us with the MambaBlock : its input x is (B, L, D) and its outputs y is also (B, L, D) (B=batch size, L=seq len, D=model dim).
@@ -49,7 +50,7 @@ class MambaConfig:
     inner_layernorms: bool = False # apply layernorms to internal activations
 
     pscan: bool = True # use parallel scan mode or sequential mode when training
-    use_cuda: bool = False # use official CUDA implementation when training
+    use_cuda: bool = False # use official CUDA implementation when training (not compatible with (b)float16)
 
     def __post_init__(self):
         self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
@@ -165,6 +166,7 @@ class MambaBlock(nn.Module):
         # projects block output from ED back to D
         self.out_proj = nn.Linear(config.d_inner, config.d_model, bias=config.bias)
 
+        # used in jamba
         if self.config.inner_layernorms:
             self.dt_layernorm = RMSNorm(self.config.dt_rank, config.rms_norm_eps)
             self.B_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
@@ -230,12 +232,14 @@ class MambaBlock(nn.Module):
         delta, B, C = self._apply_layernorms(delta, B, C)
         delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
         
+        # choose which selective_scan function to use, according to config
         if self.config.use_cuda:
             x = x.transpose(1, 2)
             B = B.transpose(1, 2)
             C = C.transpose(1, 2)
             z = z.transpose(1, 2)
 
+            # "softplus" + "bias" + "y * silu(z)" operations are fused
             y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=self.dt_proj.bias.float())
             y = y.transpose(1, 2) # (B, L, ED)
         

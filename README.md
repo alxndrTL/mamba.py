@@ -1,6 +1,6 @@
 # mamba.py 🐍 : a simple and efficient Mamba implementation
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.
-It combines the ease of read with good performances.
+It combines the ease of read with good performances. Training and inference is supported.
 
 ## Updates
 - <b>30/03/2024</b> : Updated inference function, now supports sampling temperature and batch_size.
@@ -75,12 +75,18 @@ tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-neox-20b')
 output = model.generate(tokenizer, "Mamba is a type of")
 ```
 
+This is the structure of the `mamba.py` modules:
+
+<p align="center">
+    <img src="assets/mamba_structure.jpg" alt="a python and a mamba" width="516" height="300" alt="mamba structure"/>
+</p>
+
 ## Examples
 There are two basics examples available :
 - `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
-If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, easily swipe it with a Transformer, come up with your own data, etc ...
+If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
 
 ___
 ## Performances
@@ -139,15 +145,16 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
+- following the performance update, update perf graph
 - plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
-- Jamba ? inference and/or fine-tuning ?
+- ~~Jamba ? inference and/or fine-tuning ?~~
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
 - ~~a step function, used for (auto-regressive) inference.~~
 - ~~a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)~~
 
-perfs :
+perfs related:
 - ~~unfold the for-loops in `pscan.py` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)~~
 ~~- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).~~
-- enable gradient checkpointing to reduce the memory usage
+- reduce the memory usage somehow (at the cost of speed if needed)
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>

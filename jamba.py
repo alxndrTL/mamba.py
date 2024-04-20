@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import json
 from typing import Union
 import math
 
@@ -8,6 +7,32 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mamba import MambaConfig, MambaBlock, RMSNorm
+
+"""
+
+This file implements the Jamba architecture, as proposed by AI21labs (altough others have proposed blending Mamba & attention in the past).
+A Jamba model combines Mamba and attention layers, as well as MoE for the MLP blocks.
+
+This file closely follows the official Jamba implementation (https://huggingface.co/ai21labs/Jamba-v0.1).
+But it is quite shorter (800 lines vs 2100 lines), because it has been stripped of all optional features that come with transformers.
+It is thus easier to read, while keeping the same performances.
+It supports training (using official CUDA mamba backend or mamba.py) & inference.
+You can also load pretrained Jamba models from HF using the from_pretrained function.
+
+Architecture of the torch modules found in this file :
+- JambaLM: the final object, used for language modeling. has an embedding layer, an lm head...
+- Jamba: core model. inputs (B, L, D), outputs (B, L, D). (B=batch size, L=seq len, D=d_model).
+  It is composed of two types of layers : MambaLayer and AttentionLayer.
+- AttentionLayer: standard GQA attention layer + MoE MLP (the attn computations are located in the AttentionSDPA module)
+- MambaLayer : standard Mamba layer + MoE MLP. (the Mamba computations are located in the mamba.py file)
+- SparseMoEBlock and MLP : Moe MLP
+
+Notes :
+-if using use_cuda, you must train in float32. If not, the following error is triggered : 
+"Expected B.scalar_type() == (!is_variable_B ? weight_type : input_type) to be true, but got false."
+when calling the selective_scan_fn function. Not clear why this error shows up when in (b)float16. TODO: investigate.
+
+"""
 
 @dataclass
 class JambaLMConfig:
@@ -33,7 +58,8 @@ class JambaLMConfig:
     dt_init_floor = 1e-4
     bias: bool = False
     conv_bias: bool = True
-    inner_layernorms: bool = False
+    inner_layernorms: bool = True
+    use_cuda: bool = False
     pscan: bool = True # use parallel scan mode or sequential mode when training
 
     # attention related
@@ -62,9 +88,11 @@ class JambaLMConfig:
         if self.dt_rank == 'auto':
             self.dt_rank = math.ceil(self.d_model / 16)
 
-        self.mamba_config = MambaConfig(self.d_model, 0, self.dt_rank, self.d_state, self.expand_factor,
-                                        self.d_conv, self.dt_min, self.dt_max, self.dt_init, self.dt_scale, self.rms_norm_eps,
-                                        self.bias, self.conv_bias, self.inner_layernorms, self.pscan)
+        self.mamba_config = MambaConfig(d_model=self.d_model, n_layers=0, dt_rank=self.dt_rank, d_state=self.d_state,
+                                        expand_factor=self.expand_factor, d_conv=self.d_conv, dt_min=self.dt_min, dt_max=self.dt_max,
+                                        dt_init=self.dt_init, dt_scale=self.dt_scale, rms_norm_eps=self.rms_norm_eps,
+                                        bias=self.bias, conv_bias=self.conv_bias, inner_layernorms=self.inner_layernorms,
+                                        pscan=self.pscan, use_cuda=self.use_cuda)
 
 def from_pretrained(name: str):
     """
@@ -140,6 +168,7 @@ class JambaLM(nn.Module):
         # tokens : (B, L)
 
         # logits : (B, L, vocab_size)
+        # router_logits : (B*L, n_experts) if n_experts>1
 
         x = self.embedding(tokens)
 
@@ -253,6 +282,7 @@ class Jamba(nn.Module):
         # x: (B, L, D)
 
         # logits: (B, L, D)
+        # router_logits : (B*L, n_experts)
 
         router_logits = []
 
@@ -357,7 +387,7 @@ class AttentionSDPA(nn.Module):
         keys = repeat_kv(keys, self.num_key_value_groups)
         values = repeat_kv(values, self.num_key_value_groups)
 
-        attn_output = torch.nn.functional.scaled_dot_product_attention(queries, keys, values,
+        attn_output = F.scaled_dot_product_attention(queries, keys, values,
                                                                        dropout_p=self.attention_dropout if self.training else 0.0,
                                                                        is_causal=(cache is None))
         attn_output = attn_output.transpose(1, 2).contiguous()
