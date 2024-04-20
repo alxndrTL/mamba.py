@@ -88,19 +88,12 @@ You can also train and run inference on Jamba models. Take a look at the `jamba.
 This is the structure of the modules  found in `jamba.py` :
 
 <p align="center">
-    <img src="assets/jamba_structure.jpg" width="612" height="357" alt="mamba structure"/>
+    <img src="assets/jamba_structure.jpg" width="737" height="429'" alt="mamba structure"/>
 </p>
 
 <p align="center">
-    <img src="assets/jamba_modules.jpg" width="422" height="240" alt="mamba structure"/>
+    <img src="assets/jamba_modules.jpg" width="548" height="312" alt="mamba structure"/>
 </p>
-
-## Examples
-There are two basics examples available :
-- `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
-- `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
-
-If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
 
 The API is the same as with the `Mamba` and `MambaLM` models.
 You can load a pretrained Jamba model like so :
@@ -114,6 +107,13 @@ tokenizer = AutoTokenizer.from_pretrained('TechxGenus/Mini-Jamba')
 
 output = model.generate(tokenizer, "def min(arr):")
 ```
+
+## Examples
+There are two basics examples available :
+- `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
+- `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
+
+If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
 
 ___
 ## Performances
