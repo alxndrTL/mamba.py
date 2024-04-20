@@ -209,7 +209,7 @@ class JambaLM(nn.Module):
         self.train()
 
         if batch_size==1:
-            return outputs[0], input_ids.shape[1] # todo : remove
+            return outputs[0]
         else:
             return outputs
     

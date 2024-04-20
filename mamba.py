@@ -27,8 +27,6 @@ See Figure 3 of the paper (page 8) for a visual representation of a MambaBlock.
 
 """
 
-# todo : rename dt
-
 @dataclass
 class MambaConfig:
     d_model: int # D
@@ -74,8 +72,6 @@ class Mamba(nn.Module):
 
         for layer in self.layers:
             x = layer(x)
-
-        #x = self.norm_f(x)
 
         return x
     
@@ -133,10 +129,10 @@ class MambaBlock(nn.Module):
                               groups=config.d_inner,
                               padding=config.d_conv - 1)
         
-        # projects x to input-dependent Δ, B, C
+        # projects x to input-dependent delta, B, C
         self.x_proj = nn.Linear(config.d_inner, config.dt_rank + 2 * config.d_state, bias=False)
 
-        # projects Δ from dt_rank to d_inner
+        # projects delta from dt_rank to d_inner
         self.dt_proj = nn.Linear(config.dt_rank, config.d_inner, bias=True)
 
         # dt initialization
@@ -149,7 +145,7 @@ class MambaBlock(nn.Module):
         else:
             raise NotImplementedError
         
-        # dt bias
+        # delta bias
         dt = torch.exp(
             torch.rand(config.d_inner) * (math.log(config.dt_max) - math.log(config.dt_min)) + math.log(config.dt_min)
         ).clamp(min=config.dt_init_floor)
@@ -162,7 +158,8 @@ class MambaBlock(nn.Module):
         # S4D real initialization
         A = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
         self.A_log = nn.Parameter(torch.log(A)) # why store A in log ? to keep A < 0 (cf -torch.exp(...)) ? for gradient stability ?
-        #todo : self.A_log._no_weight_decay = True has been added in the official Mamba implementation
+        self.A_log._no_weight_decay = True
+
         self.D = nn.Parameter(torch.ones(config.d_inner))
 
         # projects block output from ED back to D
@@ -393,8 +390,7 @@ class MambaBlock(nn.Module):
 
         y = y + D * x
 
-        # todo
-        return y, h.squeeze(1)
+        return y, h
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):
