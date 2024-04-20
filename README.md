@@ -78,7 +78,7 @@ output = model.generate(tokenizer, "Mamba is a type of")
 This is the structure of the `mamba.py` modules:
 
 <p align="center">
-    <img src="assets/mamba_structure.jpg" alt="a python and a mamba" width="670" height="390" alt="mamba structure"/>
+    <img src="assets/mamba_structure.jpg" alt="a python and a mamba" width="737" height="429" alt="mamba structure"/>
 </p>
 
 ## Examples
