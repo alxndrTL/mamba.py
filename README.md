@@ -92,7 +92,7 @@ This is the structure of the modules  found in `jamba.py` :
 </p>
 
 <p align="center">
-    <img src="assets/jamba_modules.jpg" width="548" height="312" alt="mamba structure"/>
+    <img src="assets/jamba_modules.jpg" width="602" height="343" alt="mamba structure"/>
 </p>
 
 The API is the same as with the `Mamba` and `MambaLM` models.
