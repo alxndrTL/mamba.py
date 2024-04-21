@@ -3,6 +3,8 @@ A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in 
 It combines the ease of read with good performances when training. [Jamba](https://www.ai21.com/blog/announcing-jamba) is also supported.
 
 ## Updates
+- <b>21/04/2024</b> : Added the `jamba.py` file, which implements the [Jamba](https://www.ai21.com/blog/announcing-jamba) architecture (mix of Mamba and attention layers). Also added as a possible backend the official CUDA implementation.
+
 - <b>30/03/2024</b> : Updated inference function, now supports sampling temperature and batch_size.
 
 - <b>09/02/2024</b> : First part of the performance update. For small sequences (<128), it can speed up training by more than 20% compared to the first version. For setups close to what can found in practice (like in NLP), it can speed up training by 10%. See [this](https://github.com/alxndrTL/mamba.py/pull/12).
