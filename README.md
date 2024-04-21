@@ -1,6 +1,6 @@
 # mamba.py 🐍 : a simple and efficient Mamba implementation
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.
-It combines the ease of read with good performances.
+It combines the ease of read with good performances when training. [Jamba](https://www.ai21.com/blog/announcing-jamba) is also supported.
 
 ## Updates
 - <b>30/03/2024</b> : Updated inference function, now supports sampling temperature and batch_size.
@@ -17,7 +17,7 @@ ___
 
 This graph shows the training time (forward and backward pass) of a single Mamba layer (`d_model=16, d_state=16`) using 3 different methods : `CUDA`, which is the official [Mamba implementation](https://github.com/state-spaces/mamba), `mamba.py`, which is this repo, and `sequential`, which is a sequential (RNN-like) implementation of the selective scan.
 
-This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch as well as MLX. Its primary goal is educational.
+This repo contains a simple and readable code implementing the [Mamba](https://arxiv.org/abs/2312.00752) architecture in pure PyTorch as well as MLX. You can also play around with the Jamba model, which combines Mamba and attention layers. The primary goal of this repo is educational.
 
 <p align="center">
     <img src="assets/logo.png" alt="a python and a mamba" width="300" height="300" alt="python mamba"/>
@@ -27,6 +27,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
 - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
+- `jamba.py` : a clean implementation of the Jamba model in PyTorch
 - `📁 mlx` : basically the same code as above, but in MLX.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch.
@@ -75,12 +76,44 @@ tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-neox-20b')
 output = model.generate(tokenizer, "Mamba is a type of")
 ```
 
+This is the structure of the `mamba.py` modules:
+
+<p align="center">
+    <img src="assets/mamba_structure.jpg" width="737" height="429" alt="mamba structure"/>
+</p>
+
+## Jamba
+You can also train and run inference on Jamba models. Take a look at the `jamba.py` file, which constructs a `Jamba` object, which interleaves Mamba layers (from `mamba.py`) with attention layers.
+
+This is the structure of the modules  found in `jamba.py` :
+
+<p align="center">
+    <img src="assets/jamba_structure.jpg" width="737" height="429'" alt="mamba structure"/>
+</p>
+
+<p align="center">
+    <img src="assets/jamba_modules.jpg" width="602" height="343" alt="mamba structure"/>
+</p>
+
+The API is the same as with the `Mamba` and `MambaLM` models.
+You can load a pretrained Jamba model like so :
+
+```python
+from jamba_lm import from_pretrained
+from transformers import AutoTokenizer
+
+model = from_pretrained('TechxGenus/Mini-Jamba').to("cuda")
+tokenizer = AutoTokenizer.from_pretrained('TechxGenus/Mini-Jamba')
+
+output = model.generate(tokenizer, "def min(arr):")
+```
+
 ## Examples
 There are two basics examples available :
 - `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
-If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba from scratch, easily swipe it with a Transformer, come up with your own data, etc ...
+If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba or a Jamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
 
 ___
 ## Performances
@@ -139,15 +172,16 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
+- following the performance update, update perf graph
 - plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
-- Jamba ? inference and/or fine-tuning ?
+- ~~Jamba ? inference and/or fine-tuning ?~~
 - docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
 - ~~a step function, used for (auto-regressive) inference.~~
 - ~~a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)~~
 
-perfs :
+perfs related:
 - ~~unfold the for-loops in `pscan.py` to achieve better performance (see [François Fleuret's pscan](https://fleuret.org/cgi-bin/gitweb/gitweb.cgi?p=mygptrnn.git;a=blob;f=pscan.py;h=0bb0d145bf9c6c82115956c8ce1e6a063e56e747;hb=HEAD)) (although this will sacrifice readability of bit)~~
 ~~- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).~~
-- enable gradient checkpointing to reduce the memory usage
+- reduce the memory usage somehow (at the cost of speed if needed)
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>

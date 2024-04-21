@@ -15,8 +15,9 @@ The major differences are :
 -the convolution is done with torch.nn.Conv1d
 -the selective scan is done in PyTorch
 
-A sequential version of the selective scan is also available for comparison.
+A sequential version of the selective scan is also available for comparison. Also, it is possible to use the official Mamba implementation.
 
+This is the structure of the torch modules :
 - A Mamba model is composed of several layers, which are ResidualBlock.
 - A ResidualBlock is composed of a MambaBlock, a normalization, and a residual connection : ResidualBlock(x) = mamba(norm(x)) + x
 - This leaves us with the MambaBlock : its input x is (B, L, D) and its outputs y is also (B, L, D) (B=batch size, L=seq len, D=model dim).
@@ -42,10 +43,14 @@ class MambaConfig:
     dt_scale: float = 1.0
     dt_init_floor = 1e-4
 
+    rms_norm_eps: float = 1e-5
+
     bias: bool = False
     conv_bias: bool = True
+    inner_layernorms: bool = False # apply layernorms to internal activations
 
     pscan: bool = True # use parallel scan mode or sequential mode when training
+    use_cuda: bool = False # use official CUDA implementation when training (not compatible with (b)float16)
 
     def __post_init__(self):
         self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
@@ -60,7 +65,6 @@ class Mamba(nn.Module):
         self.config = config
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
-        #self.norm_f = RMSNorm(config.d_model)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -69,8 +73,6 @@ class Mamba(nn.Module):
 
         for layer in self.layers:
             x = layer(x)
-
-        #x = self.norm_f(x)
 
         return x
     
@@ -91,7 +93,7 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.mixer = MambaBlock(config)
-        self.norm = RMSNorm(config.d_model)
+        self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -128,10 +130,10 @@ class MambaBlock(nn.Module):
                               groups=config.d_inner,
                               padding=config.d_conv - 1)
         
-        # projects x to input-dependent Δ, B, C
+        # projects x to input-dependent delta, B, C
         self.x_proj = nn.Linear(config.d_inner, config.dt_rank + 2 * config.d_state, bias=False)
 
-        # projects Δ from dt_rank to d_inner
+        # projects delta from dt_rank to d_inner
         self.dt_proj = nn.Linear(config.dt_rank, config.d_inner, bias=True)
 
         # dt initialization
@@ -144,7 +146,7 @@ class MambaBlock(nn.Module):
         else:
             raise NotImplementedError
         
-        # dt bias
+        # delta bias
         dt = torch.exp(
             torch.rand(config.d_inner) * (math.log(config.dt_max) - math.log(config.dt_min)) + math.log(config.dt_min)
         ).clamp(min=config.dt_init_floor)
@@ -157,10 +159,39 @@ class MambaBlock(nn.Module):
         # S4D real initialization
         A = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
         self.A_log = nn.Parameter(torch.log(A)) # why store A in log ? to keep A < 0 (cf -torch.exp(...)) ? for gradient stability ?
+        self.A_log._no_weight_decay = True
+
         self.D = nn.Parameter(torch.ones(config.d_inner))
 
         # projects block output from ED back to D
         self.out_proj = nn.Linear(config.d_inner, config.d_model, bias=config.bias)
+
+        # used in jamba
+        if self.config.inner_layernorms:
+            self.dt_layernorm = RMSNorm(self.config.dt_rank, config.rms_norm_eps)
+            self.B_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
+            self.C_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
+        else:
+            self.dt_layernorm = None
+            self.B_layernorm = None
+            self.C_layernorm = None
+
+        if self.config.use_cuda:
+            try:
+                from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
+                self.selective_scan_cuda = selective_scan_fn
+            except ImportError:
+                print("Failed to import mamba_ssm. Falling back to mamba.py.")
+                self.config.use_cuda = False
+
+    def _apply_layernorms(self, dt, B, C):
+        if self.dt_layernorm is not None:
+            dt = self.dt_layernorm(dt)
+        if self.B_layernorm is not None:
+            B = self.B_layernorm(B)
+        if self.C_layernorm is not None:
+            C = self.C_layernorm(C)
+        return dt, B, C
 
     def forward(self, x):
         # x : (B, L, D)
@@ -178,7 +209,11 @@ class MambaBlock(nn.Module):
         x = x.transpose(1, 2) # (B, L, ED)
 
         x = F.silu(x)
-        y = self.ssm(x)
+        y = self.ssm(x, z)
+
+        if self.config.use_cuda:
+            output = self.out_proj(y) # (B, L, D)
+            return output
 
         # z branch
         z = F.silu(z)
@@ -188,24 +223,38 @@ class MambaBlock(nn.Module):
 
         return output
     
-    def ssm(self, x):
+    def ssm(self, x, z):
         # x : (B, L, ED)
 
         # y : (B, L, ED)
 
         A = -torch.exp(self.A_log.float()) # (ED, N)
         D = self.D.float()
-        # TODO remove .float()
 
         deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
-
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
-        delta = F.softplus(self.dt_proj(delta)) # (B, L, ED)
+        delta, B, C = self._apply_layernorms(delta, B, C)
+        delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
+        
+        # choose which selective_scan function to use, according to config
+        if self.config.use_cuda:
+            x = x.transpose(1, 2)
+            B = B.transpose(1, 2)
+            C = C.transpose(1, 2)
+            z = z.transpose(1, 2)
 
-        if self.config.pscan:
-            y = self.selective_scan(x, delta, A, B, C, D)
+            # "softplus" + "bias" + "y * silu(z)" operations are fused
+            y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=self.dt_proj.bias.float())
+            y = y.transpose(1, 2) # (B, L, ED)
+        
         else:
-            y = self.selective_scan_seq(x, delta, A, B, C, D)
+            delta = delta.transpose(1, 2)
+            delta = F.softplus(delta + self.dt_proj.bias)
+
+            if self.config.pscan:
+                y = self.selective_scan(x, delta, A, B, C, D)
+            else:
+                y = self.selective_scan_seq(x, delta, A, B, C, D)
 
         return y
     
@@ -328,11 +377,11 @@ class MambaBlock(nn.Module):
 
         A = -torch.exp(self.A_log.float()) # (ED, N) # todo : ne pas le faire tout le temps, puisque c'est indépendant de la timestep
         D = self.D.float()
-        # TODO remove .float()
 
         deltaBC = self.x_proj(x) # (B, dt_rank+2*N)
 
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, dt_rank), (B, N), (B, N)
+        delta, B, C = self._apply_layernorms(delta, B, C)
         delta = F.softplus(self.dt_proj(delta)) # (B, ED)
 
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, ED, N)
@@ -349,8 +398,7 @@ class MambaBlock(nn.Module):
 
         y = y + D * x
 
-        # todo : pq h.squeeze(1) ??
-        return y, h.squeeze(1)
+        return y, h
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):
@@ -364,3 +412,4 @@ class RMSNorm(nn.Module):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.weight
 
         return output
+    

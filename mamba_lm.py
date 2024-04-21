@@ -37,6 +37,12 @@ def from_pretrained(name: str):
     """
     Returns a model loaded with pretrained weights pulled from HuggingFace.
 
+    Note :
+    This only work with the state-spaces/mamba-XXX model family, because there is a pytorch_model.bin file in the HF repo.
+    This is not the case of typical model saved on HF (like the state-spaces/mamba-XXX-hf model family).
+    To load the state dict of such models, I think the only way is to load the model into a AutoModelForCausalLM, and then
+    pass the state_dict to a MambaLM. I see no other way around unfrortunately (this is how it's done in jamba.py)
+
     Args:
         name: As of now, supports
             * 'state-spaces/mamba-2.8b-slimpj'

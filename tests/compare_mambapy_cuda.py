@@ -30,7 +30,7 @@ print(y_cuda.shape)
 
 torch.manual_seed(1)
 
-config = MambaConfig(d_model=dim, n_layers=1)
+config = MambaConfig(d_model=dim, n_layers=1, use_cuda=False)
 model = MambaBlock(config).to("cuda")
 
 y_pscan = model(x)
@@ -39,15 +39,20 @@ print(sum([p.numel() for p in model.parameters()]))
 print(y_pscan.shape)
 
 # forward #
+print("Forward pass check")
 print(torch.allclose(y_cuda, y_pscan, rtol=0.1))
  
 # backward #
+print("Backward pass check")
 J_cuda = y_cuda.sum()
 J_cuda.backward()
 
 J_pscan = y_pscan.sum()
 J_pscan.backward()
 
-print(torch.allclose(model_cuda.in_proj.weight.grad, model.in_proj.weight.grad, rtol=0.01))
-
-
+for (name1, param1), (name2, param2) in zip(model_cuda.named_parameters(), model.named_parameters()):
+    if param1.grad is not None and param2.grad is not None:  # Ensure gradients exist
+        grad_close = torch.allclose(param1.grad, param2.grad, rtol=0.01)
+        print(f"Gradients close for {name1} and {name2}: {grad_close}")
+    else:
+        print(f"No gradient for {name1} or {name2}")
