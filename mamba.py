@@ -177,8 +177,12 @@ class MambaBlock(nn.Module):
             self.C_layernorm = None
 
         if self.config.use_cuda:
-            from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
-            self.selective_scan_cuda = selective_scan_fn
+            try:
+                from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
+                self.selective_scan_cuda = selective_scan_fn
+            except ImportError:
+                print("Failed to import mamba_ssm. Falling back to mamba.py.")
+                self.config.use_cuda = False
 
     def _apply_layernorms(self, dt, B, C):
         if self.dt_layernorm is not None:
