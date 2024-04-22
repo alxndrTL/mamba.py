@@ -5,6 +5,9 @@ import os
 import time
 
 """
+this is a simplified (and not yet finished) reproduction of the picocrafter experiment done by @fchollet
+(you can look up this experiment on his X, he talked about it in Nov 2023)
+
 V1 : fully observable, tiny room with a goal generated randomly.
 going over the goal gets the agent a reward and spawn a new goal.
 the episodes ends after T steps.

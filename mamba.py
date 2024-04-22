@@ -162,6 +162,7 @@ class MambaBlock(nn.Module):
         self.A_log._no_weight_decay = True
 
         self.D = nn.Parameter(torch.ones(config.d_inner))
+        self.D._no_weight_decay = True
 
         # projects block output from ED back to D
         self.out_proj = nn.Linear(config.d_inner, config.d_model, bias=config.bias)
@@ -235,9 +236,12 @@ class MambaBlock(nn.Module):
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
         delta, B, C = self._apply_layernorms(delta, B, C)
         delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
+        # here we just apply the matrix mul operation of delta = softplus(dt_proj(delta))
+        # the rest will be applied later (fused if using cuda)
         
         # choose which selective_scan function to use, according to config
         if self.config.use_cuda:
+            # these are unfortunately needed for the selective_scan_cuda function
             x = x.transpose(1, 2)
             B = B.transpose(1, 2)
             C = C.transpose(1, 2)
