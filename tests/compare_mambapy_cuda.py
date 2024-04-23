@@ -2,6 +2,8 @@ import torch
 
 from mamba_ssm import Mamba
 
+import sys
+sys.path.append('..')
 from mamba import MambaBlock, MambaConfig
 
 batch, length, dim = 2, 512, 16
@@ -30,7 +32,7 @@ print(y_cuda.shape)
 
 torch.manual_seed(1)
 
-config = MambaConfig(d_model=dim, n_layers=1, use_cuda=False)
+config = MambaConfig(d_model=dim, n_layers=0, use_cuda=False)
 model = MambaBlock(config).to("cuda")
 
 y_pscan = model(x)
