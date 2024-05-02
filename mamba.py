@@ -2,6 +2,8 @@ import math
 from dataclasses import dataclass
 from typing import Union
 
+from numpy import stack
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -88,7 +90,7 @@ class Mamba(nn.Module):
         for i, layer in enumerate(self.layers):
             x, caches[i] = layer.forward_with_caches(x, requested_caches)
 
-        return x
+        return x, caches
     
     def step(self, x, caches):
         # x : (B, L, D)
@@ -264,6 +266,17 @@ class MambaBlock(nn.Module):
 
         # x branch
         x = x.transpose(1, 2) # (B, ED, L)
+        padded_sequence = F.pad(
+            x, (self.config.d_conv - 2, 0), mode='constant', value=0
+        ).transpose(1, 2)
+        # req cache = 1 -> [0, 0, input[0]] -> (pad = dconv - 2) -> [0, 0, padded_input[2 (req - 1 + d_conv - 2)]]
+        # assert self.config.d_conv == 4
+        stacked_conv_caches = []
+        for b, request in enumerate(requested_caches):
+            assert request >= 1
+            conv_cache = padded_sequence[b:b+1, (request-1):(request + self.config.d_conv - 2), :]
+            stacked_conv_caches.append(conv_cache)
+        stacked_conv_caches = torch.cat(stacked_conv_caches, dim=0).transpose(1, 2)
         x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
         x = x.transpose(1, 2) # (B, L, ED)
 
@@ -280,7 +293,7 @@ class MambaBlock(nn.Module):
         output = y * z
         output = self.out_proj(output) # (B, L, D)
 
-        return output
+        return output, (ssm_caches, stacked_conv_caches)
     
 
     def ssm_with_caches(self, x, requested_caches: list[int]):
@@ -298,6 +311,9 @@ class MambaBlock(nn.Module):
         # here we just apply the matrix mul operation of delta = softplus(dt_proj(delta))
         # the rest will be applied later (fused if using cuda)
     
+        delta = delta.transpose(1, 2)
+        delta = F.softplus(delta + self.dt_proj.bias)
+
         y, caches = self.selective_scan_with_caches(x, delta, A, B, C, D, requested_caches=requested_caches)
 
         return y, caches
@@ -373,7 +389,7 @@ class MambaBlock(nn.Module):
 
         # y : (B, L, ED)
 
-        print(delta.shape, A.shape)
+        # print(delta.shape, A.shape)
         deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, L, ED, N)
         deltaB = delta.unsqueeze(-1) * B.unsqueeze(2) # (B, L, ED, N)
 
@@ -385,7 +401,12 @@ class MambaBlock(nn.Module):
 
         y = y + D * x
 
-        return y, hs[F.one_hot(torch.tensor(requested_caches, device=hs.device), num_classes=hs.size(1)).bool()]
+        # print(hs.shape)
+        # print(F.one_hot(torch.tensor(requested_caches, device=hs.device), num_classes=hs.size(1)).bool().shape)
+        caches = hs[F.one_hot(torch.tensor([r - 1 for r in requested_caches], device=hs.device), num_classes=hs.size(1)).bool()]
+        # print(caches.shape)
+
+        return y, caches
     
     def selective_scan_seq(self, x, delta, A, B, C, D):
         # x : (B, L, ED)

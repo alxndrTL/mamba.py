@@ -126,7 +126,7 @@ class MambaLM(nn.Module):
 
         x = self.embedding(tokens)
 
-        x, caches = self.mamba.forward_with_caches(x, requested_caches= requested_caches)
+        x, caches = self.mamba.forward_with_caches(x, requested_caches=requested_caches)
         x = self.norm_f(x)
 
         logits = self.lm_head(x)
