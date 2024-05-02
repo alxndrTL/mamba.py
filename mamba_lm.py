@@ -115,6 +115,23 @@ class MambaLM(nn.Module):
         logits = self.lm_head(x)
 
         return logits
+
+    def forward_with_caches(self, tokens, requested_caches: list[int]):
+        # tokens : (B, L)
+
+        # logits : (B, L, vocab_size)
+
+        # logits : (B) (tells us the last token in each sequence, i.e. the one for which we want the cache)
+
+
+        x = self.embedding(tokens)
+
+        x, caches = self.mamba.forward_with_caches(x, requested_caches= requested_caches)
+        x = self.norm_f(x)
+
+        logits = self.lm_head(x)
+
+        return logits, caches
     
     def step(self, token, caches):
         # token : (B)
