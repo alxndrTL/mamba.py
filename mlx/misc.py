@@ -22,9 +22,9 @@ def unsqueeze(x, axis):
 
     assert axis <= len(x.shape)
     if axis >= 0:
-        new_shape = x.shape[:axis] + [1] + x.shape[axis:]
+        new_shape = x.shape[:axis] + tuple([1]) + x.shape[axis:]
     else:
-        new_shape = x.shape + [1]
+        new_shape = x.shape + tuple([1])
     return x.reshape(new_shape)
 
 def clamp(x, min=None, max=None):
