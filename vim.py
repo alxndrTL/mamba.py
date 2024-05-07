@@ -54,6 +54,8 @@ class MambaConfig:
 
     bidirectional: bool = True # use bidirectional MambaBlock
 
+    divide_output: bool = True
+
     def __post_init__(self):
         self.d_inner = self.expand_factor * self.d_model # E*D = ED in comments
 
@@ -96,28 +98,12 @@ class ResidualBlock(nn.Module):
 
         self.mixer = MambaBlock(config)
         self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
-        self.bidirectional = config.bidirectional
 
     def forward(self, x):
         # x : (B, L, D)
 
         # output : (B, L, D)
-
-        # Forward Direction
-        output_f = self.mixer(self.norm(x), Forward=True)
-
-        if not self.bidirectional:
-            output = self.mixer.out_proj(output_f) + x
-            return output
-        
-        # Backward Direction
-        x_b = x.flip([1])
-        output_b = self.mixer(self.norm(x_b), Forward=False)
-
-        # Forward + Backward + Residual
-        output = self.mixer.out_proj(output_f + output_b.flip([1])) + x
-
-        return output
+        return self.mixer(self.norm(x)) + x
     
     def step(self, x, cache):
         # x : (B, D)
@@ -181,21 +167,22 @@ class MambaBlock(nn.Module):
         self.D._no_weight_decay = True
 
         # Backward Parameters
-        A_b = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
-        self.A_log_b = nn.Parameter(torch.log(A_b))
-        self.A_log_b._no_weight_decay = True
+        if config.bidirectional:
+            A_b = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(config.d_inner, 1)
+            self.A_log_b = nn.Parameter(torch.log(A_b))
+            self.A_log_b._no_weight_decay = True
 
-        self.conv1d_b = nn.Conv1d(in_channels=config.d_inner, out_channels=config.d_inner,
-                                  kernel_size=config.d_conv, bias=config.conv_bias,
-                                  groups=config.d_inner,
-                                  padding=config.d_conv - 1)
-        
-        self.x_proj_b = nn.Linear(config.d_inner, config.dt_rank + 2 * config.d_state, bias=False)
+            self.conv1d_b = nn.Conv1d(in_channels=config.d_inner, out_channels=config.d_inner,
+                                    kernel_size=config.d_conv, bias=config.conv_bias,
+                                    groups=config.d_inner,
+                                    padding=config.d_conv - 1)
+            
+            self.x_proj_b = nn.Linear(config.d_inner, config.dt_rank + 2 * config.d_state, bias=False)
 
-        self.dt_proj_b = nn.Linear(config.dt_rank, config.d_inner, bias=True)
+            self.dt_proj_b = nn.Linear(config.dt_rank, config.d_inner, bias=True)
 
-        self.D_b = nn.Parameter(torch.ones(config.d_inner))
-        self.D_b._no_weight_decay = True
+            self.D_b = nn.Parameter(torch.ones(config.d_inner))
+            self.D_b._no_weight_decay = True
 
         # projects block output from ED back to D
         self.out_proj = nn.Linear(config.d_inner, config.d_model, bias=config.bias)
@@ -227,55 +214,72 @@ class MambaBlock(nn.Module):
             C = self.C_layernorm(C)
         return dt, B, C
 
-    def forward(self, x, Forward = True):
+    def forward(self, x):
         # x : (B, L, D)
         
         # y : (B, L, D)
-        
-        # NOTE: No output projection here, as it is done in the ResidualBlock to combine the forward and backward outputs
         
         _, L, _ = x.shape
         xz = self.in_proj(x) # (B, L, 2*ED)
         x, z = xz.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
         x = x.transpose(1, 2) # (B, ED, L)
+        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
+        x = x.transpose(1, 2) # (B, L, ED)
+        x = F.silu(x)
+        y = self.ssm(x=x, 
+                     z=z,
+                     A_log=self.A_log,
+                     D=self.D,
+                     x_proj=self.x_proj,
+                     dt_proj=self.dt_proj)
 
-        if Forward:
-            
-            x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
-            x = x.transpose(1, 2) # (B, L, ED)
-            x = F.silu(x)
-            y = self.ssm(x, z)
-        
-        else:
-
-            x = self.conv1d_b(x)[:, :, :L]
-            x = x.transpose(1, 2)
-
-            x = F.silu(x)
-            y = self.ssm_back(x, z)
+        if self.config.bidirectional:
+            xz_b = xz.flip([1]) # (B, L, 2*ED)
+            x_b, z_b = xz_b.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
+            x_b = x_b.transpose(1, 2) # (B, ED, L)
+            x_b = self.conv1d_b(x_b)[:, :, :L] # depthwise convolution over time, with a short filter
+            x_b = x_b.transpose(1, 2) # (B, L, ED)
+            x_b = F.silu(x_b)
+            y_b = self.ssm(x=x_b,
+                           z=z_b,
+                           A_log=self.A_log_b,
+                           D=self.D_b,
+                           x_proj=self.x_proj_b,
+                           dt_proj=self.dt_proj_b)
 
         if self.config.use_cuda:
-            return y
-
-        # z branch
+            if not self.config.bidirectional:
+                return self.out_proj(y)
+            else:
+                if self.config.divide_output:
+                    return self.out_proj((y + y_b.flip([1])) / 2)
+                else:
+                    return self.out_proj(y + y_b.flip([1]))
+        
         z = F.silu(z)
-
-        output = y * z
-
-        return output
+        y = y * z
+        if not self.config.bidirectional:
+            return self.out_proj(y)
+        else:
+            z_b = F.silu(z_b)
+            y_b = y_b * z_b
+            if self.config.divide_output:
+                return self.out_proj((y + y_b.flip([1])) / 2)
+            else:
+                return self.out_proj(y + y_b.flip([1]))
     
-    def ssm(self, x, z):
+    def ssm(self, x, z, A_log, D, x_proj, dt_proj):
         # x : (B, L, ED)
 
         # y : (B, L, ED)
 
-        A = -torch.exp(self.A_log.float()) # (ED, N)
-        D = self.D.float()
+        A = -torch.exp(A_log.float()) # (ED, N)
+        D = D.float()
 
-        deltaBC = self.x_proj(x) # (B, L, dt_rank+2*N)
+        deltaBC = x_proj(x) # (B, L, dt_rank+2*N)
         delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1) # (B, L, dt_rank), (B, L, N), (B, L, N)
         delta, B, C = self._apply_layernorms(delta, B, C)
-        delta = self.dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
+        delta = dt_proj.weight @ delta.transpose(1, 2) # (ED, dt_rank) @ (B, L, dt_rank) -> (B, ED, L)
         # here we just apply the matrix mul operation of delta = softplus(dt_proj(delta))
         # the rest will be applied later (fused if using cuda)
         
@@ -288,51 +292,18 @@ class MambaBlock(nn.Module):
             z = z.transpose(1, 2)
 
             # "softplus" + "bias" + "y * silu(z)" operations are fused
-            y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=self.dt_proj.bias.float())
+            y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=dt_proj.bias.float())
             y = y.transpose(1, 2) # (B, L, ED)
         
         else:
             delta = delta.transpose(1, 2)
-            delta = F.softplus(delta + self.dt_proj.bias)
+            delta = F.softplus(delta + dt_proj.bias)
 
             if self.config.pscan:
                 y = self.selective_scan(x, delta, A, B, C, D)
             else:
                 y = self.selective_scan_seq(x, delta, A, B, C, D)
 
-        return y
-    
-    def ssm_back(self, x, z):
-        # x : (B, L, ED)
-
-        # y : (B, L, ED)
-
-        A = -torch.exp(self.A_log_b.float())
-        D = self.D_b.float()
-
-        deltaBC = self.x_proj_b(x)
-        delta, B, C = torch.split(deltaBC, [self.config.dt_rank, self.config.d_state, self.config.d_state], dim=-1)
-        delta, B, C = self._apply_layernorms(delta, B, C)
-        delta = self.dt_proj_b.weight @ delta.transpose(1, 2)
-
-        if self.config.use_cuda:
-            x = x.transpose(1, 2)
-            B = B.transpose(1, 2)
-            C = C.transpose(1, 2)
-            z = z.transpose(1, 2)
-
-            y = self.selective_scan_cuda(x, delta, A, B, C, D, z=z, delta_softplus=True, delta_bias=self.dt_proj_b.bias.float())
-            y = y.transpose(1, 2)
-        
-        else:
-            delta = delta.transpose(1, 2)
-            delta = F.softplus(delta + self.dt_proj_b.bias)
-
-            if self.config.pscan:
-                y = self.selective_scan(x, delta, A, B, C, D)
-            else:
-                y = self.selective_scan_seq(x, delta, A, B, C, D)
-        
         return y
     
     def selective_scan(self, x, delta, A, B, C, D):
