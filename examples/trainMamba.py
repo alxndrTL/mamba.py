@@ -31,6 +31,13 @@ device = (
 
 print(f"> Using {device} device")
 
+def listdir_nohidden(path):
+    files = []
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            files.append(f"{path}/{f}")
+    return files
+
 def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -78,7 +85,8 @@ def train(pretrained=False):
     model_path = f'saves/model.pth'
 
     # Usage of datasets' built in datasets
-    dataset = datasets.load_dataset('wikitext', 'wikitext-2-v1')
+    #dataset = datasets.load_dataset('wikitext', 'wikitext-2-v1')
+    dataset = datasets.load_dataset('text', data_files={'train': listdir_nohidden("./gutenberg")}, encoding='utf-8',encoding_errors='ignore')
 
     # Usage of custom txt datasets
     '''
