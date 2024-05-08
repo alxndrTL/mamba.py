@@ -4,6 +4,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import sys
 sys.path.append('..')
 
+import shutil
+
 from time import perf_counter
 
 import torch
@@ -77,19 +79,21 @@ def train(pretrained=False):
     seq_length - number of tokens in model's context during training
     learning_rate - initial learning rate of the training
     model_path - path to the saved weights; if empty it'll save there new weights during training
+    backup_path - path to the backup of a model. if None - no backup is created
     '''
     epochs = 150
     batch_size = 64 #32 for 24GB and 130m model
     seq_length = 128
     learning_rate = 1e-3
     model_path = f'saves/model.pth'
+    backup_path = f"saves/model-b.pth"
 
     # Usage of datasets' built in datasets
     dataset = datasets.load_dataset('wikitext', 'wikitext-2-v1')
 
     # https://www.kaggle.com/datasets/nltkdata/gutenberg
     #dataset = datasets.load_dataset('text', data_files={'train': listdir_nohidden("./gutenberg")}, encoding='utf-8',encoding_errors='ignore')
-
+    
     # Usage of custom txt datasets
     '''
     In order to load custom training data add filepaths to the list
@@ -213,6 +217,9 @@ def train(pretrained=False):
                         'optimizer_state': optim.state_dict(),
                         'scheduler_state': scheduler.state_dict(),
                     }
+                    # Create backup file
+                    if backup_path is not None and os.path.isfile(model_path):
+                        shutil.copyfile(model_path, backup_path)
                     torch.save(checkpoint, model_path)
 
             # Increment idx
