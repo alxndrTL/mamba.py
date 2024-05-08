@@ -73,7 +73,7 @@ def train(pretrained=False):
     '''
     epochs = 150
     batch_size = 64 #32 for 24GB and 130m model
-    seq_length = 256
+    seq_length = 128
     learning_rate = 1e-3
     model_path = f'saves/model.pth'
 
@@ -249,7 +249,7 @@ def my_gen(pretrained=False):
         return
 
     # Generate text based on prompt
-    output = model.generate(tokenizer, "Mamba is "
+    output = model.generate(tokenizer, "She was the youngest of the two daughters "
                             , num_tokens=50
                             , temperature=0.8
                             , top_k=None)
@@ -266,5 +266,5 @@ if __name__ == "__main__":
     seed_everything(534)
     prepare_folders()
 
-    train(pretrained=False)
-    #my_gen(pretrained=False)
+    #train(pretrained=False)
+    my_gen(pretrained=False)
