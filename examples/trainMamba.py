@@ -266,5 +266,5 @@ if __name__ == "__main__":
     seed_everything(534)
     prepare_folders()
 
-    #train(pretrained=False)
-    my_gen(pretrained=False)
+    train(pretrained=False)
+    #my_gen(pretrained=False)
