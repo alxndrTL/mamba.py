@@ -85,8 +85,10 @@ def train(pretrained=False):
     model_path = f'saves/model.pth'
 
     # Usage of datasets' built in datasets
-    #dataset = datasets.load_dataset('wikitext', 'wikitext-2-v1')
-    dataset = datasets.load_dataset('text', data_files={'train': listdir_nohidden("./gutenberg")}, encoding='utf-8',encoding_errors='ignore')
+    dataset = datasets.load_dataset('wikitext', 'wikitext-2-v1')
+
+    # https://www.kaggle.com/datasets/nltkdata/gutenberg
+    #dataset = datasets.load_dataset('text', data_files={'train': listdir_nohidden("./gutenberg")}, encoding='utf-8',encoding_errors='ignore')
 
     # Usage of custom txt datasets
     '''
