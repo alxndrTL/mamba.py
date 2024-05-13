@@ -174,6 +174,7 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
+- pscan implementation using [ThunderKittens](https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk) ?
 - following the performance update, update perf graph
 - plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
 - ~~Jamba ? inference and/or fine-tuning ?~~
