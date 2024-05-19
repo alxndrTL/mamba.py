@@ -10,8 +10,8 @@ temperature = 1.0
 top_k = 40
 sample = True
 
-provider = ['CPUExecutionProvider', 'CUDAExecutionProvider']
-model = ort.InferenceSession('mamba-130m.onnx', providers=provider)
+provider = ['CPUExecutionProvider', ]
+model = ort.InferenceSession('mamba-370m.onnx', providers=provider)
 
 
 # See https://huggingface.co/state-spaces/mamba-2.8b/discussions/3
@@ -23,14 +23,22 @@ input_ids = tokenizer(inputs, return_tensors='pt').input_ids
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
+def init_zeros(shape: list):
+    return to_numpy(torch.zeros(shape))
+
+hs = init_zeros(model.get_inputs()[1].shape)
+inputs = init_zeros(model.get_inputs()[2].shape)
+
 for i in range(input_ids.size(1) + num_tokens - 1):
     with torch.no_grad():
         # print(input_ids[:, i].shape)
-        ort_input = {model.get_inputs()[0].name: to_numpy(input_ids[:, i])}
+        ort_input = {model.get_inputs()[0].name: to_numpy(input_ids[:, i]), model.get_inputs()[1].name: hs, model.get_inputs()[2].name: inputs}
         # return a list of outputs
-        next_token = model.run(None, ort_input)[0]
-        # convert to tensor
-        next_token = torch.from_numpy(next_token)
+        run_result = model.run(None, ort_input)
+        # print(len(run_result))
+        next_token = torch.from_numpy(run_result[0])
+        hs = run_result[1]
+        inputs = run_result[2]
     
     if i+1 >= input_ids.size(1):
         probs = F.softmax(next_token / temperature, dim=-1) # (batch_size, vocab_size)

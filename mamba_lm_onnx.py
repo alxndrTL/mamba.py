@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mamba import Mamba, MambaConfig, RMSNorm
+from mamba_onnx import Mamba, MambaConfig, RMSNorm
 
 """
 
@@ -87,7 +87,7 @@ def from_pretrained(name: str):
 
     model.load_state_dict(new_state_dict)
 
-    return model
+    return model #, config
 
 class MambaLM(nn.Module):
     def __init__(self, lm_config: MambaLMConfig):
@@ -102,10 +102,15 @@ class MambaLM(nn.Module):
         self.lm_head = nn.Linear(self.config.d_model, self.lm_config.vocab_size, bias=False)
         self.lm_head.weight = self.embedding.weight
         
-    def __caches(self):
-        return [(None, torch.zeros(1, self.config.d_inner, self.config.d_conv-1, device=next(self.parameters()).device)) for _ in range(self.config.n_layers)]
-    
-    def forward(self, token):
+    def init_caches(self):
+        # hs will be initialized to zeros, so do inputs
+        hs = torch.zeros(self.config.n_layers, 1, self.config.d_inner, self.config.d_state, device=next(self.parameters()).device)
+        # inputs size would be like this
+        inputs = torch.zeros(self.config.n_layers, 1, self.config.d_inner, self.config.d_conv-1, device=next(self.parameters()).device)
+        
+        return hs, inputs
+        
+    def forward(self, token, hs, inputs):
         # token : (B)
         # caches : [cache(layer) for all layers], cache : (h, inputs)
 
@@ -113,13 +118,11 @@ class MambaLM(nn.Module):
         # caches : [cache(layer) for all layers], cache : (h, inputs)
 
         x = self.embedding(token)
-        
-        caches = self.__caches()
 
-        x, caches = self.mamba.step(x, caches)
+        x, hs, inputs = self.mamba.step(x, hs, inputs)
         x = self.norm_f(x)
 
         logits = self.lm_head(x)
 
-        return logits
+        return logits, hs, inputs
     
