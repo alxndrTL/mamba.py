@@ -30,9 +30,10 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
 - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
 - `jamba.py` : a clean implementation of the Jamba model in PyTorch
+- `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
 - `📁 mlx` : basically the same code as above, but in MLX.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
-- `📁 examples` : two examples of how to use the Mamba model in PyTorch.
+- `📁 examples` : two examples of how to use the Mamba model in PyTorch as well as a training file.
 
 ## Usage
 
