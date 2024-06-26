@@ -32,6 +32,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `jamba.py` : a clean implementation of the Jamba model in PyTorch
 - `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
 - `📁 mlx` : basically the same code as above, but in MLX.
+- `📁 onnx` : export a trained Mamba model in ONNX for inference.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch as well as a training file.
 
