@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: mambapy
-Version: 0.1.2
+Version: 1.0.0
 Summary: A simple and efficient Mamba implementation in pure PyTorch.
 Home-page: https://github.com/votre_nom/mamba.py
 Author: Alexandre TL

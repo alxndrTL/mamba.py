@@ -1,5 +1,5 @@
 import torch
-from mamba_lm_onnx import from_pretrained
+from mambapy.onnx.mamba_lm_onnx import from_pretrained
 
 model = from_pretrained('state-spaces/mamba-370m')
 model.eval()

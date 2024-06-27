@@ -12,3 +12,8 @@ mambapy.egg-info/SOURCES.txt
 mambapy.egg-info/dependency_links.txt
 mambapy.egg-info/requires.txt
 mambapy.egg-info/top_level.txt
+mambapy/onnx/__init__.py
+mambapy/onnx/mamba_lm_onnx.py
+mambapy/onnx/mamba_onnx.py
+mambapy/onnx/onnx_convert.py
+mambapy/onnx/onnx_usage.py

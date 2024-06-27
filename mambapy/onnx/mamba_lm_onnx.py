@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mambapy.mamba import Mamba, MambaConfig, RMSNorm
+from mambapy.onnx.mamba_onnx import Mamba, MambaConfig, RMSNorm
 
 """
 
@@ -54,7 +54,7 @@ def from_pretrained(name: str):
 
     Returns:
         model: a Mamba model configured with the proper parameters and initialized with the proper weights
-    """
+    """   
 
     try:
         from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
@@ -91,7 +91,7 @@ def from_pretrained(name: str):
 
     model.load_state_dict(new_state_dict)
 
-    return model
+    return model #, config
 
 class MambaLM(nn.Module):
     def __init__(self, lm_config: MambaLMConfig):
@@ -105,22 +105,16 @@ class MambaLM(nn.Module):
 
         self.lm_head = nn.Linear(self.config.d_model, self.lm_config.vocab_size, bias=False)
         self.lm_head.weight = self.embedding.weight
-
-    def forward(self, tokens):
-        # tokens : (B, L)
-
-        # logits : (B, L, vocab_size)
-
-        x = self.embedding(tokens)
-
-        x = self.mamba(x)
-        x = self.norm_f(x)
-
-        logits = self.lm_head(x)
-
-        return logits
-    
-    def step(self, token, caches):
+        
+    def init_caches(self):
+        # hs will be initialized to zeros, so do inputs
+        hs = torch.zeros(self.config.n_layers, 1, self.config.d_inner, self.config.d_state, device=next(self.parameters()).device)
+        # inputs size would be like this
+        inputs = torch.zeros(self.config.n_layers, 1, self.config.d_inner, self.config.d_conv-1, device=next(self.parameters()).device)
+        
+        return hs, inputs
+        
+    def forward(self, token, hs, inputs):
         # token : (B)
         # caches : [cache(layer) for all layers], cache : (h, inputs)
 
@@ -129,53 +123,10 @@ class MambaLM(nn.Module):
 
         x = self.embedding(token)
 
-        x, caches = self.mamba.step(x, caches)
+        x, hs, inputs = self.mamba.step(x, hs, inputs)
         x = self.norm_f(x)
 
         logits = self.lm_head(x)
 
-        return logits, caches
-    
-    # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
-    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
-        self.eval()
-
-        input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
-        input_ids = input_ids.repeat(batch_size, 1)
-
-        # caches is a list of cache, one per layer
-        # cache is composed of : the hidden state, and the last d_conv-1 inputs
-        # the hidden state because the update is like an RNN
-        # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
-        caches = [(None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
-
-        for i in range(input_ids.size(1) + num_tokens - 1):
-            with torch.no_grad():
-                # forward the new output, get new cache
-                next_token_logits, caches = self.step(input_ids[:, i], caches) # (batch_size, vocab_size), caches
-
-            # sample (no sampling when the prompt is being processed)
-            if i+1 >= input_ids.size(1):
-                probs = F.softmax(next_token_logits / temperature, dim=-1) # (batch_size, vocab_size)
-
-                if top_k is not None:
-                    values, _ = torch.topk(probs, k=top_k) # (batch_size, k) ordered from lowest to biggest
-                    probs[probs < values[:, -1, None]] = 0
-                    probs = probs / probs.sum(axis=1, keepdims=True)
-
-                if sample:
-                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (batch_size)
-                else:
-                    next_token = torch.argmax(probs, dim=-1) # (batch_size)
-
-                input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
-                
-        outputs = [tokenizer.decode(output.tolist()) for output in input_ids]
-
-        self.train()
-
-        if batch_size==1:
-            return outputs[0]
-        else:
-            return outputs
+        return logits, hs, inputs
     
