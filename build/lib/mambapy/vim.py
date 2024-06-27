@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mambapy.pscan import pscan
+from pscan import pscan
 
 """
 
