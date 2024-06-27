@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mamba import Mamba, MambaConfig, RMSNorm
+from mambapy.mamba import Mamba, MambaConfig, RMSNorm
 
 """
 
@@ -54,10 +54,14 @@ def from_pretrained(name: str):
 
     Returns:
         model: a Mamba model configured with the proper parameters and initialized with the proper weights
-    """   
+    """
 
-    from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
-    from transformers.utils.hub import cached_file
+    try:
+        from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
+        from transformers.utils.hub import cached_file
+    except ImportError:
+        print("The from_pretrained function pulls weights from HuggingFace and thus needs transformers to be installed (pip install transformers)")
+        return
 
     def load_config_hf(model_name):
         resolved_archive_file = cached_file(model_name, CONFIG_NAME, _raise_exceptions_for_missing_entries=False)

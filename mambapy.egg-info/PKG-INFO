@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: mambapy
-Version: 0.1.0
+Version: 0.1.2
 Summary: A simple and efficient Mamba implementation in pure PyTorch.
 Home-page: https://github.com/votre_nom/mamba.py
 Author: Alexandre TL
@@ -11,6 +11,7 @@ Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: torch
 
 # mamba.py 🐍 : a simple and efficient Mamba implementation
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.

@@ -2,11 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name='mambapy',
-    version='0.1.0',
+    version='0.1.2',
     packages=find_packages(),
     install_requires=[
         'torch',
-        'transformers'
     ],
     author='Alexandre TL',
     author_email='alexandretl3434@gmail.com',
