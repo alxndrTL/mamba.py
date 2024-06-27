@@ -1,21 +1,17 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import sys
-sys.path.append('..')
-
 import shutil
 
 from time import perf_counter
 
 import torch
 import torch.nn.functional as F
-import torch.nn as nn
-from mamba_lm import from_pretrained
-from mamba_lm import MambaLM, MambaLMConfig
+
+from mambapy.mamba_lm import from_pretrained
+from mambapy.mamba_lm import MambaLM, MambaLMConfig
 
 from transformers import AutoTokenizer
-
 import datasets
 
 import numpy as np

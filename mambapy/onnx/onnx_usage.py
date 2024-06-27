@@ -1,9 +1,11 @@
 import torch
 import torch.nn.functional as F
 
-from transformers import AutoTokenizer
-
-import onnxruntime as ort
+try:
+    from transformers import AutoTokenizer
+    import onnxruntime as ort
+except ImportError:
+    print("Using ONNX needs the transformers and onnxruntime library.")
 
 num_tokens = 50
 temperature = 1.0
@@ -12,7 +14,6 @@ sample = True
 
 provider = ['CPUExecutionProvider', ]
 model = ort.InferenceSession('mamba-370m.onnx', providers=provider)
-
 
 # See https://huggingface.co/state-spaces/mamba-2.8b/discussions/3
 tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-neox-20b')

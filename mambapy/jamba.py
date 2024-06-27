@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mamba import MambaConfig, MambaBlock, RMSNorm
+from mambapy.mamba import MambaConfig, MambaBlock, RMSNorm
 
 """
 
@@ -109,7 +109,11 @@ def from_pretrained(name: str):
         model: a Jamba model configured with the proper parameters and initialized with the proper weights
     """
 
-    from transformers import AutoModelForCausalLM
+    try:
+        from transformers import AutoModelForCausalLM
+    except ImportError:
+        print("The from_pretrained function pulls weights from HuggingFace and thus needs transformers to be installed (pip install transformers)")
+        return
 
     model_hf = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.float32, use_mamba_kernels=False, device_map="auto", trust_remote_code=True)
         
