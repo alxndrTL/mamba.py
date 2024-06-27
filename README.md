@@ -183,6 +183,7 @@ ___
 ## TODOs
 - finish docs
 - Mamba 2
+- clean `vim.py`
 - following the performance update, update perf graph
 - plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
 - pscan implementation using [ThunderKittens](https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk) ?
