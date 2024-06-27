@@ -3,9 +3,11 @@ A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in 
 It combines the ease of read with good performances when training. [Jamba](https://www.ai21.com/blog/announcing-jamba) is also supported.
 
 ## Updates
+- <b>27/06/2024</b> : Deployed a package version of `mamba.py` on PyPI, which you can install with `pip install mambapy`. This is in order to integrate the library in transformers 🤗.
+
 - <b>21/04/2024</b> : Added the `jamba.py` file, which implements the [Jamba](https://www.ai21.com/blog/announcing-jamba) architecture (mix of Mamba and attention layers). Also added as a possible backend the official CUDA implementation.
 
-- <b>30/03/2024</b> : Updated inference function, now supports sampling temperature and batch_size.
+- <b>30/03/2024</b> : Updated inference function, now supports a custom sampling temperature and batch_size.
 
 - <b>09/02/2024</b> : First part of the performance update. For small sequences (<128), it can speed up training by more than 20% compared to the first version. For setups close to what can found in practice (like in NLP), it can speed up training by 10%. See [this](https://github.com/alxndrTL/mamba.py/pull/12).
 
@@ -26,24 +28,27 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 </p>
 
 <u>The repo is organized as follows : </u>
-- `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
-- `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
-- `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
-- `jamba.py` : a clean implementation of the Jamba model in PyTorch
-- `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
+- `📁 mambapy` : the PyTorch implementation of Mamba
+    - `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
+    - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
+    - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
+    - `jamba.py` : a clean implementation of the Jamba model in PyTorch
+    - `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
+    - `📁 onnx` : export a trained Mamba model in ONNX for inference.
 - `📁 mlx` : basically the same code as above, but in MLX.
-- `📁 onnx` : export a trained Mamba model in ONNX for inference.
-- `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan
+- `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan for now.
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch as well as a training file.
 
 ## Usage
+
+You can either download this repo or install it with `pip install mambapy`.
 
 The most basic usage is to use the `Mamba` object ([mamba.py](mamba.py)), which implements a simple Mamba model given a configuration.
 No embedding, no head : input is `(B, L, D)` and output is `(B, L, D)` as well.
 
 ```python
 import torch
-from mamba import Mamba, MambaConfig
+from mambapy.mamba import Mamba, MambaConfig
 
 config = MambaConfig(d_model=16, n_layers=2)
 model = Mamba(config)
@@ -58,7 +63,7 @@ assert y.shape == x.shape
 The class `MambaLM` ([mamba_lm.py](mamba_lm.py)) builds on the `Mamba` object and offers a classic API for language models. It can be used as follows :
 
 ```python
-from mamba_lm import MambaLM, MambaLMConfig
+from mambapy.mamba_lm import MambaLM, MambaLMConfig
 
 config = MambaLMConfig(d_model=16, n_layers=4, vocab_size=32000)
 model = MambaLM(config)
@@ -71,7 +76,7 @@ It simply encapsulates a `Mamba` object with an embedding layer, a final normali
 
 You can use it off the shelf with a pretrained Mamba model :
 ```python
-from mamba_lm import from_pretrained
+from mambapy.mamba_lm import from_pretrained
 from transformers import AutoTokenizer
 
 model = from_pretrained('state-spaces/mamba-130m').to("cuda")
@@ -103,7 +108,7 @@ The API is the same as with the `Mamba` and `MambaLM` models.
 You can load a pretrained Jamba model like so :
 
 ```python
-from jamba_lm import from_pretrained
+from mambapy.jamba_lm import from_pretrained
 from transformers import AutoTokenizer
 
 model = from_pretrained('TechxGenus/Mini-Jamba').to("cuda")
@@ -112,7 +117,7 @@ tokenizer = AutoTokenizer.from_pretrained('TechxGenus/Mini-Jamba')
 output = model.generate(tokenizer, "def min(arr):")
 ```
 
-## Examples
+## `📁 examples`
 There are two basics examples available :
 - `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
@@ -176,11 +181,12 @@ ___
 - x.com/fchollet : original pscan implementation.
 
 ## TODOs
-- pscan implementation using [ThunderKittens](https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk) ?
+- finish docs
+- Mamba 2
 - following the performance update, update perf graph
 - plot the training mem consumption of the three differents mamba imple (official, naive, mamba.py)
+- pscan implementation using [ThunderKittens](https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk) ?
 - ~~Jamba ? inference and/or fine-tuning ?~~
-- docs
 - ~~more tests with an increased `d_model` (add a Performances section)~~
 - ~~a step function, used for (auto-regressive) inference.~~
 - ~~a training function, similar to [llama2.c](https://github.com/karpathy/llama2.c)~~
