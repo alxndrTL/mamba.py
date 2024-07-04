@@ -13,14 +13,20 @@ class MyRNN(nn.Module):
         out = self.fc(out)
         return out, hidden  
 
-B, L, D = 512, 1000, 512
+# 1000 = no OOM
+B, L, D = 512, 250, 512
+
+torch.cuda.reset_peak_memory_stats(device=None)
+print(f"gpu used {torch.cuda.memory_allocated(device=None) / (1024**2)} MB")
 
 model = MyRNN(input_size=D, hidden_size=D, output_size=D).to("cuda")
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+print(f"gpu used {torch.cuda.memory_allocated(device=None) / (1024**2)} MB")
 x = torch.randn(B, L, D).to("cuda")
+print(f"gpu used {torch.cuda.memory_allocated(device=None) / (1024**2)} MB")
 
-chunk_size = 1000
+chunk_size = 100
 num_chunks = x.shape[1] // chunk_size
 remainder = x.shape[1] % chunk_size
 
@@ -28,8 +34,7 @@ remainder = x.shape[1] % chunk_size
 hidden = None
 optimizer.zero_grad()
 
-print(f"seq len: {x.shape[1]}")
-print(f"number of chunks: {num_chunks} and remainder: {remainder}")
+print(f"seq len: {x.shape[1]}. number of chunks: {num_chunks} and remainder: {remainder}")
 
 for i in range(num_chunks):
     start_idx = i * chunk_size
@@ -38,7 +43,7 @@ for i in range(num_chunks):
     
     output, hidden = model(chunk, hidden)
     loss = output.sum()
-    loss.backward(retain_graph=True)
+    loss.backward(retain_graph=not(i==num_chunks-1 and remainder==0))
 
 if remainder > 0:
     remainder_start_idx = num_chunks * chunk_size
@@ -46,6 +51,8 @@ if remainder > 0:
 
     output, hidden = model(chunk, hidden)
     loss = output.sum()
-    loss.backward(retain_graph=True)
+    loss.backward()
 
 print("Done")
+
+print(f"gpu used {torch.cuda.max_memory_allocated(device=None) / (1024**2)} MB")

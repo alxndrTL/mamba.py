@@ -58,7 +58,7 @@ if remainder > 0:
 
     output, hidden = model(chunk, hidden)
     loss = output.sum()
-    loss.backward(retain_graph=True)
+    loss.backward()
 
 print(model.fc.weight.grad.mean())
 print(model.rnn.weight_ih_l0.grad.mean())
