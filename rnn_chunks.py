@@ -11,30 +11,18 @@ class MyRNN(nn.Module):
     def forward(self, x, hidden):
         out, hidden = self.rnn(x, hidden) # (B, L, hidden_size), (num_layers, B, hidden_size)
         out = self.fc(out)
-        return out, hidden
+        return out, hidden  
 
-model = MyRNN(input_size=10, hidden_size=20, output_size=1)
+B, L, D = 512, 1000, 512
+
+model = MyRNN(input_size=D, hidden_size=D, output_size=D).to("cuda")
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-x = torch.randn(2, 100, 10) # (B, L, D)
+x = torch.randn(B, L, D).to("cuda")
 
-chunk_size = 30
+chunk_size = 1000
 num_chunks = x.shape[1] // chunk_size
 remainder = x.shape[1] % chunk_size
-
-# classic forward
-hidden = None
-optimizer.zero_grad()
-
-output, hidden = model(x, hidden)
-loss = output.sum()
-loss.backward()
-
-print(model.fc.weight.grad.mean())
-print(model.rnn.weight_ih_l0.grad.mean())
-print(model.rnn.weight_hh_l0.grad.mean())
-print(model.rnn.weight_ih_l1.grad.mean())
-print(model.rnn.weight_hh_l1.grad.mean())
 
 # segmented forward
 hidden = None
@@ -60,8 +48,4 @@ if remainder > 0:
     loss = output.sum()
     loss.backward(retain_graph=True)
 
-print(model.fc.weight.grad.mean())
-print(model.rnn.weight_ih_l0.grad.mean())
-print(model.rnn.weight_hh_l0.grad.mean())
-print(model.rnn.weight_ih_l1.grad.mean())
-print(model.rnn.weight_hh_l1.grad.mean())
+print("Done")
