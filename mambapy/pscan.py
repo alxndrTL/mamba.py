@@ -149,7 +149,7 @@ class PScan(torch.autograd.Function):
             Aa[:, :, :-1, 1].mul_(Aa[:, :, 1:, 0])
 
     @staticmethod
-    def forward(ctx, A_in, X_in):
+    def forward(ctx, A_in, X_in, H_0=None):
         """
         Applies the parallel scan operation, as defined above. Returns a new tensor.
         If you can, privilege sequence lengths that are powers of two.
@@ -157,12 +157,23 @@ class PScan(torch.autograd.Function):
         Args:
             A_in : (B, L, D, N)
             X_in : (B, L, D, N)
+            H_0  : (B, D, N) = None
 
         Returns:
             H : (B, L, D, N)
         """
 
-        L = X_in.size(1)
+        B, L, D, N = X_in.size()
+
+        if H_0 is not None:
+            X_in = torch.cat([H_0.unsqueeze(1), X_in], dim=1)
+            A_in = torch.cat([torch.ones(B, 1, D, N), A_in], dim=1)
+            L = L+1
+
+            if L != npo2(L):
+                # pad tensors
+                A = pad_npo2(A_in) # (B, npo2(L), D, N)
+                X = pad_npo2(X_in) # (B, npo2(L), D, N)
 
         # cloning is requiered because of the in-place ops
         if L == npo2(L):
@@ -180,10 +191,13 @@ class PScan(torch.autograd.Function):
         # parallel scan (modifies X in-place)
         PScan.pscan(A, X)
 
-        ctx.save_for_backward(A_in, X)
+        ctx.save_for_backward(A_in, X, H_0)
         
         # slice [:, :L] (cut if there was padding)
-        return X.transpose(2, 1)[:, :L]
+        if H_0 is not None:
+            return X.transpose(2, 1)[:, 1:L]
+        else:
+            return X.transpose(2, 1)[:, :L]
     
     @staticmethod
     def backward(ctx, grad_output_in):
@@ -191,16 +205,20 @@ class PScan(torch.autograd.Function):
         Flows the gradient from the output to the input. Returns two new tensors.
 
         Args:
-            ctx : A_in : (B, L, D, N), X : (B, D, L, N)
+            ctx : A_in : (B, L, D, N), X : (B, D, L, N), H_0 : (B, D, N) = None
             grad_output_in : (B, L, D, N)
 
         Returns:
-            gradA : (B, L, D, N), gradX : (B, L, D, N)
+            gradA : (B, L, D, N), gradX : (B, L, D, N), gradH_0 : (B, D, N) (if H_0 is not None)
         """
 
-        A_in, X = ctx.saved_tensors
+        A_in, X, H_0 = ctx.saved_tensors
 
-        L = grad_output_in.size(1)
+        B, L, D, N = grad_output_in.size()
+
+        if H_0 is not None:
+            grad_output_in = torch.cat([torch.zeros(B, 1, D, N), grad_output_in], dim=1)
+            L = L+1
 
         # cloning is requiered because of the in-place ops
         if L == npo2(L):
@@ -221,6 +239,10 @@ class PScan(torch.autograd.Function):
         Q = torch.zeros_like(X)
         Q[:, :, 1:].add_(X[:, :, :-1] * grad_output[:, :, 1:])
 
-        return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
+        if H_0 is not None:
+            grad_output = grad_output.transpose(2, 1)
+            return Q.transpose(2, 1)[:, 1:L], grad_output[:, 1:L], grad_output[:, 0]
+        else:
+            return Q.transpose(2, 1)[:, :L], grad_output.transpose(2, 1)[:, :L]
     
 pscan = PScan.apply
