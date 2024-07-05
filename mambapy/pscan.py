@@ -167,7 +167,7 @@ class PScan(torch.autograd.Function):
 
         if H_0 is not None:
             X_in = torch.cat([H_0.unsqueeze(1), X_in], dim=1)
-            A_in = torch.cat([torch.ones(B, 1, D, N), A_in], dim=1)
+            A_in = torch.cat([torch.ones(B, 1, D, N, device=A_in.device), A_in], dim=1)
             L = L+1
 
             if L != npo2(L):
@@ -217,7 +217,7 @@ class PScan(torch.autograd.Function):
         B, L, D, N = grad_output_in.size()
 
         if H_0 is not None:
-            grad_output_in = torch.cat([torch.zeros(B, 1, D, N), grad_output_in], dim=1)
+            grad_output_in = torch.cat([torch.zeros(B, 1, D, N, device=grad_output_in.device), grad_output_in], dim=1)
             L = L+1
 
         # cloning is requiered because of the in-place ops
