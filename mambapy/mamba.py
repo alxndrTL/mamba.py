@@ -214,7 +214,7 @@ class MambaBlock(nn.Module):
 
         if self.config.use_cuda:
             output = self.out_proj(y) # (B, L, D)
-            return output
+            return output # the rest of the operations are done in the ssm function (fused with the CUDA pscan)
 
         # z branch
         z = F.silu(z)
