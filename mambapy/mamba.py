@@ -66,15 +66,20 @@ class Mamba(nn.Module):
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
 
-    def forward(self, x):
+    def forward(self, x, hiddens=None):
         # x : (B, L, D)
+        # hiddens : [hidden], one per layer, hidden : (B, ED, N)
 
         # y : (B, L, D)
 
-        for layer in self.layers:
-            x = layer(x)
+        if hiddens is None:
+            for i, layer in enumerate(self.layers):
+                x, _ = layer(x)
+        else:
+            for i, layer in enumerate(self.layers):
+                x, hiddens[i] = layer(x, hiddens[i] if hiddens is not None else None)
 
-        return x
+        return x, hiddens
     
     def step(self, x, caches):
         # x : (B, L, D)
@@ -95,13 +100,16 @@ class ResidualBlock(nn.Module):
         self.mixer = MambaBlock(config)
         self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
 
-    def forward(self, x):
+    def forward(self, x, hidden=None):
         # x : (B, L, D)
+        # hidden : (B, ED, N)
 
         # output : (B, L, D)
 
-        output = self.mixer(self.norm(x)) + x
-        return output
+        output, hidden = self.mixer(self.norm(x), hidden)
+        output = output + x
+
+        return output, hidden
     
     def step(self, x, cache):
         # x : (B, D)
@@ -194,8 +202,11 @@ class MambaBlock(nn.Module):
             C = self.C_layernorm(C)
         return dt, B, C
 
-    def forward(self, x):
+    def forward(self, x, hidden=None):
         # x : (B, L, D)
+        # hidden : (B, ED, N)
+
+        # todo : attention "hidden" ne marche que en mambapy (not cuda)
         
         # y : (B, L, D)
 
@@ -210,7 +221,7 @@ class MambaBlock(nn.Module):
         x = x.transpose(1, 2) # (B, L, ED)
 
         x = F.silu(x)
-        y = self.ssm(x, z)
+        y, hidden = self.ssm(x, z, hidden)
 
         if self.config.use_cuda:
             output = self.out_proj(y) # (B, L, D)
@@ -222,10 +233,11 @@ class MambaBlock(nn.Module):
         output = y * z
         output = self.out_proj(output) # (B, L, D)
 
-        return output
+        return output, hidden
     
-    def ssm(self, x, z):
+    def ssm(self, x, z, hidden=None):
         # x : (B, L, ED)
+        # hidden : (B, ED, N)
 
         # y : (B, L, ED)
 
@@ -256,19 +268,21 @@ class MambaBlock(nn.Module):
             delta = F.softplus(delta + self.dt_proj.bias)
 
             if self.config.pscan:
-                y = self.selective_scan(x, delta, A, B, C, D)
+                y, hidden = self.selective_scan(x, delta, A, B, C, D, hidden)
             else:
+                # TODO hidden
                 y = self.selective_scan_seq(x, delta, A, B, C, D)
 
-        return y
+        return y, hidden
     
-    def selective_scan(self, x, delta, A, B, C, D):
+    def selective_scan(self, x, delta, A, B, C, D, hidden=None):
         # x : (B, L, ED)
         # Δ : (B, L, ED)
         # A : (ED, N)
         # B : (B, L, N)
         # C : (B, L, N)
         # D : (ED)
+        # hidden : (B, ED, N)
 
         # y : (B, L, ED)
 
@@ -277,13 +291,16 @@ class MambaBlock(nn.Module):
 
         BX = deltaB * (x.unsqueeze(-1)) # (B, L, ED, N)
         
-        hs = pscan(deltaA, BX)
+        if hidden is None:
+            hs = pscan(deltaA, BX)
+        else:
+            hs = pscan(deltaA, BX, hidden)
 
         y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
 
         y = y + D * x
 
-        return y
+        return y, hs[:, -1]
     
     def selective_scan_seq(self, x, delta, A, B, C, D):
         # x : (B, L, ED)

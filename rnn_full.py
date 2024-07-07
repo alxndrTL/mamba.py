@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+torch.manual_seed(123456)
+
 class MyRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(MyRNN, self).__init__()
@@ -41,3 +43,6 @@ print(f"gpu used {torch.cuda.memory_allocated(device=None) / (1024**2)} MB")
 print("Done")
 
 print(f"max gpu used {torch.cuda.max_memory_allocated(device=None) / (1024**2)} MB")
+
+#print(model.fc.weight.grad.mean())
+#print(model.fc.bias.grad.mean())

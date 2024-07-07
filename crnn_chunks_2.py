@@ -6,14 +6,15 @@ torch.cuda.reset_peak_memory_stats(device=None)
 torch.manual_seed(123456)
 
 # Define batch size, sequence length, and model dimension
-B, L, D = 512, 1024, 64
+B, L, D = 32, 1024, 64
 
 # Configure and initialize the RNN model
 config = RNNConfig(d_model=D, n_layers=2, dropout=0.)
 model = RNN(config).to("cuda")
 
 # Generate random input data
-x = torch.randn(B, L, D, requires_grad=True, device="cuda")
+x = torch.randn(B, L, D, device="cuda")
+x.requires_grad = True
 
 # Define the chunk size (sequence length per chunk)
 chunk_size = 128
