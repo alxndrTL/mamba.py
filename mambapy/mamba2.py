@@ -1,7 +1,10 @@
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 
 """
+
 adapted from https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba2_simple.py
+It justs implements a config similar to what's being done in mamba.py, as well as supports muP.
+
 """
 
 import math

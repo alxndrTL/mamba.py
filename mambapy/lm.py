@@ -1,6 +1,6 @@
 """
 
-Universal language model, which accepts as its core a Mamba.
+Universal language model, which accepts as its core a Mamba or Mamba-2 model.
 It has an embedding layer, and a LM head which maps the model output to logits.
 
 """
@@ -19,8 +19,6 @@ from mambapy.mamba2 import Mamba2, Mamba2Config
 
 # TODO generate function : batch size != 1 ? (for now B=1)
 # TODO generate function : top-p sampling
-
-# todo : comments, and source
 
 class LM(nn.Module):
     def __init__(self, model_config: Union[MambaConfig, Mamba2Config], vocab_size: int, pad_vocab_size_multiple: int = None):
@@ -45,13 +43,14 @@ class LM(nn.Module):
         self.lm_head = nn.Linear(self.config.d_model, vocab_size, bias=False)
         self.embedding.weight = self.lm_head.weight
 
+        # muP custom initialization
         if self.config.mup and isinstance(self.config, MambaConfig):
             for pn, p in self.named_parameters():
-                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_delta_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight', 'mixer.x_proj.weight']):
+                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_delta_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight', 'mixer.x_proj.weight']): # "hidden weights"
                     std = self.config.base_std
 
                     if 'mixer.out_proj.weight' in pn:
-                        std = std / math.sqrt(2 * self.config.n_layers)
+                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layer which projects onto the residual stream (not muP related)
 
                     if 'mixer.dt_proj.weight' in pn:
                         std = self.config.dt_rank**-0.5 * self.config.dt_scale
@@ -63,7 +62,7 @@ class LM(nn.Module):
                     torch.nn.init.zeros_(p)
                 elif pn == "embedding.weight":
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
-                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D']):
+                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D']): # keep standard Mamba init for these params
                     pass
                 else:
                     # here, we only have biases
@@ -74,18 +73,18 @@ class LM(nn.Module):
         
         elif self.config.mup and isinstance(self.config, Mamba2Config):
             for pn, p in self.named_parameters():
-                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight']):
+                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight']): # "hidden weights"
                     std = self.config.base_std
 
                     if 'mixer.out_proj.weight' in pn:
-                        std = std / math.sqrt(2 * self.config.n_layers)
+                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layer which projects onto the residual stream (not muP related)
 
                     torch.nn.init.normal_(p, mean=0.0, std=std / math.sqrt(self.config.mup_width_mult))
                 elif 'mixer.conv1d.weight' in pn:
                     torch.nn.init.zeros_(p)
                 elif pn == "embedding.weight":
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
-                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D', 'mixer.dt_bias']):
+                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D', 'mixer.dt_bias']): # keep standard Mamba init for these params
                     pass
                 else:
                     # here, we only have biases
