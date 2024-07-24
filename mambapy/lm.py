@@ -86,7 +86,7 @@ class LM(nn.Module):
                     pass
                 else:
                     # here, we only have biases
-                    assert p.dim() == 1, f"a 2d param ({pn}) has not been filtered out for init. please check."
+                    assert p.dim() == 1, f"a 2d param has not been filtered out for init. please check."
 
                     if "bias" in pn:
                         torch.nn.init.zeros_(p)

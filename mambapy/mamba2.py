@@ -80,7 +80,7 @@ class Mamba2(nn.Module):
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
 
-    def forward(self, x, caches=None):
+    def forward(self, x):
         # x : (B, L, D)
 
         # y : (B, L, D)
@@ -88,7 +88,7 @@ class Mamba2(nn.Module):
         for layer in self.layers:
             x = layer(x)
 
-        return x, None
+        return x
     
     def step(self, x, caches):
         # x : (B, L, D)
@@ -107,7 +107,7 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.mixer = Mamba2Block(config)
-        self.norm = RMSNorm(config.d_model, config.norm_eps, config.mup)
+        self.norm = RMSNorm(config.d_model, config.rms_norm_eps, config.mup)
 
     def forward(self, x):
         # x : (B, L, D)

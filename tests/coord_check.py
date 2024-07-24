@@ -9,6 +9,10 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 FDICT = {'l1': lambda x: torch.abs(x).mean(dtype=torch.float32)}
 
 def convert_fdict(d):
@@ -245,7 +249,6 @@ def _get_coord_data(models, dataloader, optcls, nsteps=5,
         batch = next(iter(dataloader))
         dataloader = [batch] * nsteps
     if show_progress:
-        from tqdm import tqdm
         pbar = tqdm(total=nseeds * len(models))
 
     for i in range(nseeds):
@@ -313,9 +316,7 @@ def _get_coord_data(models, dataloader, optcls, nsteps=5,
     return pd.DataFrame(df)
 
 
-def get_coord_data(models, dataloader, optcls,
-                    filter_trainable_by_name=None,
-                    **kwargs):
+def get_coord_data(models, dataloader, optcls, nsteps, **kwargs):
     '''Get coord data for coord check.
 
     Train the models in `models` with data from `dataloader` and optimizer
@@ -398,7 +399,7 @@ def get_coord_data(models, dataloader, optcls,
         behavior by setting `one_hot_target=True`.
     '''
     
-    data = _get_coord_data(models, dataloader, optcls, **kwargs)
+    data = _get_coord_data(models, dataloader, optcls, nsteps, **kwargs)
     return data
 
 
@@ -444,8 +445,7 @@ def plot_coord_data(df, y='l1', save_to=None, suptitle=None, x='width', hue='mod
     '''
     ### preprocessing
     df = copy(df)
-    # nn.Sequential has name '', which duplicates the output layer
-    df = df[df.module != '']
+    df = df[df.module != ''] # nn.Sequential has name '', which duplicates the output layer
     if module_list is not None:
         df = df[df['module'].isin(module_list)]
     else:
@@ -453,16 +453,13 @@ def plot_coord_data(df, y='l1', save_to=None, suptitle=None, x='width', hue='mod
             df = df[df['module'].str.contains(name_contains)]
         if name_not_contains is not None:
             df = df[~(df['module'].str.contains(name_not_contains))]
-    # for nn.Sequential, module names are numerical
     try:
-        df['module'] = pd.to_numeric(df['module'])
+        df['module'] = pd.to_numeric(df['module']) # for nn.Sequential, module names are numerical
     except ValueError:
         pass
 
     ts = df.t.unique()
 
-    import matplotlib.pyplot as plt
-    import seaborn as sns
     sns.set()
 
     def tight_layout(plt):
@@ -477,7 +474,7 @@ def plot_coord_data(df, y='l1', save_to=None, suptitle=None, x='width', hue='mod
     for t in ts:
         t = int(t)
         plt.subplot(1, len(ts), t)
-        sns.lineplot(x=x, y=y, data=df[df.t == t], hue=hue, hue_order=hue_order, legend=None) #legend=legend if t == 1 else None)
+        sns.lineplot(x=x, y=y, data=df[df.t == t], hue=hue, hue_order=hue_order, legend=None) # to show legend, set legend if t == 1 else None
         plt.title(f't={t}')
         if t != 1:
             plt.ylabel('')

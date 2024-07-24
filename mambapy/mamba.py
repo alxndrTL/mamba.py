@@ -207,6 +207,7 @@ class MambaBlock(nn.Module):
         
         # y : (B, L, D)
 
+
         _, L, _ = x.shape
 
         xz = self.in_proj(x) # (B, L, 2*ED)
