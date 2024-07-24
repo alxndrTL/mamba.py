@@ -1,12 +1,13 @@
 """
-Universal language model, which accepts as its core a Transformer or a Mamba.
 
-The Transformer is implemented in PyTorch and supports FlashAttention-2/
-For Mamba, you have the choice : use mamba.py's pure PyTorch implementation (cf mamba/mamba.py) or use the CUDA implementation.
+Universal language model, which accepts as its core a Mamba.
+It has an embedding layer, and a LM head which maps the model output to logits.
+
 """
 
 from typing import Union
 import inspect
+import json
 import math
 
 import torch
@@ -16,28 +17,30 @@ import torch.nn.functional as F
 from mambapy.mamba import Mamba, MambaConfig, RMSNorm
 from mambapy.mamba2 import Mamba2, Mamba2Config
 
-# todo : inference function
+# TODO generate function : batch size != 1 ? (for now B=1)
+# TODO generate function : top-p sampling
+
 # todo : comments, and source
 
-# todo : join the two configure_optimizer func ?
-# todo : suppr mamba_lm ? oui
-
 class LM(nn.Module):
-    def __init__(self, model_config: Union[MambaConfig, Mamba2Config], vocab_size: int):
+    def __init__(self, model_config: Union[MambaConfig, Mamba2Config], vocab_size: int, pad_vocab_size_multiple: int = None):
         super().__init__()
+
+        if pad_vocab_size_multiple != None and (vocab_size % pad_vocab_size_multiple != 0):
+            vocab_size += (pad_vocab_size_multiple - vocab_size % pad_vocab_size_multiple)
 
         self.config = model_config
 
         self.embedding = nn.Embedding(vocab_size, self.config.d_model, padding_idx=0)
         
         if isinstance(self.config, MambaConfig):
-            self.core = Mamba(self.config)
+            self.mamba = Mamba(self.config)
         elif isinstance(self.config, Mamba2Config):
-            self.core = Mamba2(self.config)
+            self.mamba = Mamba2(self.config)
         else:
             raise NotImplementedError
 
-        self.out_norm = RMSNorm(self.config.d_model, self.config.rms_norm_eps, self.config.mup)
+        self.norm_f = RMSNorm(self.config.d_model, self.config.rms_norm_eps, self.config.mup)
 
         self.lm_head = nn.Linear(self.config.d_model, vocab_size, bias=False)
         self.embedding.weight = self.lm_head.weight
@@ -103,8 +106,8 @@ class LM(nn.Module):
         # logits : (B, L, vocab_size)
 
         x = self.embedding(tokens)
-        x = self.core(x)
-        x = self.out_norm(x)
+        x = self.mamba(x)
+        x = self.norm_f(x)
 
         if self.config.mup:
             x = x / self.config.mup_width_mult
@@ -112,17 +115,68 @@ class LM(nn.Module):
         logits = self.lm_head(x)
 
         return logits
+    
+    def step(self, token, caches):
+        # token : (B)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        # logits : (B, vocab_size)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        x = self.embedding(token)
+
+        x, caches = self.mamba.step(x, caches)
+        x = self.norm_f(x)
+
+        if self.config.mup:
+            x = x / self.config.mup_width_mult
         
-    def forward_up_to(self, tokens, layer):
-        # tokens : (B, L)
-        # layer (1->n_layers): will stop the forward pass just after this layer
+        logits = self.lm_head(x)
 
-        # x : (B, L, D) activations after {layer}
+        return logits, caches
+    
+    # TODO process prompt in parallel, and pass in sequential mode when prompt is finished ?
+    def generate(self, tokenizer, prompt: str, num_tokens: int = 50, batch_size: int = 1, sample: bool = True, top_k: int = 40, temperature: float = 1.0):
+        self.eval()
 
-        x = self.embedding(tokens)
-        x = self.core(x, stop_at_layer=layer)
+        input_ids = tokenizer(prompt, return_tensors='pt').input_ids.to(next(self.parameters()).device) # (1, num_tokens)
+        input_ids = input_ids.repeat(batch_size, 1)
 
-        return x
+        # caches is a list of cache, one per layer
+        # cache is composed of : the hidden state, and the last d_conv-1 inputs
+        # the hidden state because the update is like an RNN
+        # the last d_conv-1 inputs because they are used in a 1d convolution (usually d_conv=4 so this is not large)
+        caches = [(None, torch.zeros(batch_size, self.config.d_inner, self.config.d_conv-1, device=input_ids.device)) for _ in range(self.config.n_layers)]
+
+        for i in range(input_ids.size(1) + num_tokens - 1):
+            with torch.no_grad():
+                # forward the new output, get new cache
+                next_token_logits, caches = self.step(input_ids[:, i], caches) # (batch_size, vocab_size), caches
+
+            # sample (no sampling when the prompt is being processed)
+            if i+1 >= input_ids.size(1):
+                probs = F.softmax(next_token_logits / temperature, dim=-1) # (batch_size, vocab_size)
+
+                if top_k is not None:
+                    values, _ = torch.topk(probs, k=top_k) # (batch_size, k) ordered from lowest to biggest
+                    probs[probs < values[:, -1, None]] = 0
+                    probs = probs / probs.sum(axis=1, keepdims=True)
+
+                if sample:
+                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1) # (batch_size)
+                else:
+                    next_token = torch.argmax(probs, dim=-1) # (batch_size)
+
+                input_ids = torch.cat([input_ids, next_token.unsqueeze(1)], dim=1)
+                
+        outputs = [tokenizer.decode(output.tolist()) for output in input_ids]
+
+        self.train()
+
+        if batch_size==1:
+            return outputs[0]
+        else:
+            return outputs
     
     # non-muP init (taken from llama2.c)
     def _init_weights(self, module):
@@ -187,3 +241,63 @@ class LM(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, betas=betas, fused=use_fused)
 
         return optimizer
+
+# adapted from https://github.com/johnma2006/mamba-minimal
+def from_pretrained(name: str):
+    """
+    Returns a model loaded with pretrained weights pulled from HuggingFace.
+
+    Note :
+    This only work with the state-spaces/mamba-XXX model family, because there is a pytorch_model.bin file in the HF repo.
+    This is not the case of typical model saved on HF (like the state-spaces/mamba-XXX-hf model family).
+    To load the state dict of such models, I think the only way is to load the model into a AutoModelForCausalLM, and then
+    pass the state_dict to a MambaLM. I see no other way around unfrortunately (this is how it's done in jamba.py)
+
+    Args:
+        name: As of now, supports
+            * 'state-spaces/mamba-2.8b-slimpj'
+            * 'state-spaces/mamba-2.8b'
+            * 'state-spaces/mamba-1.4b'
+            * 'state-spaces/mamba-790m'
+            * 'state-spaces/mamba-370m'
+            * 'state-spaces/mamba-130m'
+
+    Returns:
+        model: a Mamba model configured with the proper parameters and initialized with the proper weights
+    """
+
+    try:
+        from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
+        from transformers.utils.hub import cached_file
+    except ImportError:
+        print("The from_pretrained function pulls weights from HuggingFace and thus needs transformers to be installed (pip install transformers)")
+        return
+
+    def load_config_hf(model_name):
+        resolved_archive_file = cached_file(model_name, CONFIG_NAME, _raise_exceptions_for_missing_entries=False)
+        return json.load(open(resolved_archive_file))
+                
+    def load_state_dict_hf(model_name):
+        resolved_archive_file = cached_file(model_name, WEIGHTS_NAME, _raise_exceptions_for_missing_entries=False)
+        return torch.load(resolved_archive_file, weights_only=True, map_location='cpu', mmap=True)
+        
+    # copy config data
+    config_data = load_config_hf(name)
+    config = MambaConfig(d_model=config_data['d_model'], n_layers=config_data['n_layers'])
+    model = LM(config, config_data['vocab_size'])
+
+    # copy weights
+    state_dict = load_state_dict_hf(name)
+
+    new_state_dict = {}
+    for key in state_dict:
+        if key == 'backbone.embedding.weight' or key == 'backbone.norm_f.weight':
+            new_key = key.replace('backbone.', '')
+        else:
+            new_key = key.replace('backbone', 'mamba')
+
+        new_state_dict[new_key] = state_dict[key]
+
+    model.load_state_dict(new_state_dict)
+
+    return model
