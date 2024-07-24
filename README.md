@@ -137,6 +137,11 @@ If you want a full training example (like in llama2.c), you can check the [othel
 muP makes it possible by initializing and scaling the learning rates of the weights the model in a specific way. This is the result of these modifications:
 
 [coord check]
+
+SP is stand parametrization, and muP is maximal update parametrization.
+
+For each training step (t=0, 1..., 5)
+
 [TOOD: finish writing this section]
 
 ___
