@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from mambapy.mamba import MambaConfig
+from mambapy.mamba2 import Mamba2Config
 from mambapy.lm import LM
 
 from coord_check import get_coord_data, plot_coord_data
@@ -29,7 +29,7 @@ class RandomDataset(Dataset):
         return x, y
 
 def lazy_model(width):
-    config = MambaConfig(d_model=width, n_layers=n_layers, mup=use_mup, mup_base_width=widths[0], use_cuda=True)
+    config = Mamba2Config(d_model=width, n_layers=n_layers, d_head=16, mup=use_mup, mup_base_width=widths[0])
     return lambda: LM(config, vocab_size=max_value).to("cuda")
 
 models = {width: lazy_model(width) for width in widths}
@@ -43,8 +43,8 @@ optcls = lambda model: model.configure_optimizers(0.1, lr, (0.9, 0.95), "cuda")
 df = get_coord_data(models, iter_, optcls)
 
 if use_mup:
-    name = "mamba.png"
+    name = "mamba2.png"
 else:
-    name = "mamba_mup.png"
+    name = "mamba2_mup.png"
 
 plot_coord_data(df, legend="auto", save_to=name)

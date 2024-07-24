@@ -44,6 +44,7 @@ class MambaConfig:
     dt_init_floor = 1e-4
 
     rms_norm_eps: float = 1e-5
+    base_std: float = 0.02
 
     bias: bool = False
     conv_bias: bool = True

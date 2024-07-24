@@ -14,14 +14,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mambapy.mamba import Mamba, MambaConfig, RMSNorm
+from mambapy.mamba2 import Mamba2, Mamba2Config
 
 # todo : inference function
 # todo : comments, and source
 
 # todo : join the two configure_optimizer func ?
+# todo : suppr mamba_lm ? oui
 
 class LM(nn.Module):
-    def __init__(self, model_config: Union[MambaConfig, None], vocab_size: int):
+    def __init__(self, model_config: Union[MambaConfig, Mamba2Config], vocab_size: int):
         super().__init__()
 
         self.config = model_config
@@ -30,6 +32,8 @@ class LM(nn.Module):
         
         if isinstance(self.config, MambaConfig):
             self.core = Mamba(self.config)
+        elif isinstance(self.config, Mamba2Config):
+            self.core = Mamba2(self.config)
         else:
             raise NotImplementedError
 
@@ -57,6 +61,28 @@ class LM(nn.Module):
                 elif pn == "embedding.weight":
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
                 elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D']):
+                    pass
+                else:
+                    # here, we only have biases
+                    assert p.dim() == 1, f"a 2d param ({pn}) has not been filtered out for init. please check."
+
+                    if "bias" in pn:
+                        torch.nn.init.zeros_(p)
+        
+        elif self.config.mup and isinstance(self.config, Mamba2Config):
+            for pn, p in self.named_parameters():
+                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight']):
+                    std = self.config.base_std
+
+                    if 'mixer.out_proj.weight' in pn:
+                        std = std / math.sqrt(2 * self.config.n_layers)
+
+                    torch.nn.init.normal_(p, mean=0.0, std=std / math.sqrt(self.config.mup_width_mult))
+                elif 'mixer.conv1d.weight' in pn:
+                    torch.nn.init.zeros_(p)
+                elif pn == "embedding.weight":
+                    torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
+                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D', 'mixer.dt_bias']):
                     pass
                 else:
                     # here, we only have biases
@@ -107,29 +133,8 @@ class LM(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=self.config.base_std)
 
-    # taken from llama2.c
+    # adaped from llama2.c
     def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
-        param_dict = {pn: p for pn, p in self.named_parameters()}
-        param_dict = {pn: p for pn, p in param_dict.items() if p.requires_grad}
-
-        # any parameters that is 2D will be weight decayed, otherwise no. (i.e. all weight tensors in matmuls + embeddings decay, all biases and rmnsnorms don't)
-        decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
-        nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
-
-        optim_groups = [
-            {'params': decay_params, 'weight_decay': weight_decay},
-            {'params': nodecay_params, 'weight_decay': 0.0}
-        ]
-
-        # Create AdamW optimizer and use the fused version if it is available
-        fused_available = 'fused' in inspect.signature(torch.optim.AdamW).parameters
-        use_fused = fused_available and device_type == 'cuda'
-        extra_args = dict(fused=True) if use_fused else dict()
-        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, **extra_args)
-
-        return optimizer
-
-    def configure_optimizers_mup(self, weight_decay, learning_rate, betas, device_type):
         param_dict = {pn: p for pn, p in self.named_parameters()}
         param_dict = {pn: p for pn, p in param_dict.items() if p.requires_grad}
 
@@ -151,6 +156,22 @@ class LM(nn.Module):
                 {'params': nodecay_params, 'weight_decay': 0.0, 'lr': learning_rate}
             ]
 
+        elif self.config.mup and isinstance(self.config, Mamba2Config):
+            mup_params_keys = set([pn for pn in param_dict.keys() if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight'])])
+            
+            dim2_params_keys = set([pn for pn in param_dict.keys() if param_dict[pn].dim() >= 2])
+            dim2_params_keys = dim2_params_keys.difference(mup_params_keys)
+
+            mup_parameters = [p for n, p in param_dict.items() if n in mup_params_keys]
+            decay_params = [p for n, p in param_dict.items() if n in dim2_params_keys]
+            nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2] # biases and D and A
+
+            optim_groups = [
+                {'params': mup_parameters, 'weight_decay': weight_decay * self.config.mup_width_mult, 'lr': learning_rate / self.config.mup_width_mult},
+                {'params': decay_params, 'weight_decay': weight_decay, 'lr': learning_rate},
+                {'params': nodecay_params, 'weight_decay': 0.0, 'lr': learning_rate}
+            ]
+
         else:
             decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
             nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
@@ -159,7 +180,7 @@ class LM(nn.Module):
                 {'params': decay_params, 'weight_decay': weight_decay, 'lr': learning_rate},
                 {'params': nodecay_params, 'weight_decay': 0.0, 'lr': learning_rate}
             ]
-
+        
         # Create AdamW optimizer and use the fused version if it is available
         fused_available = 'fused' in inspect.signature(torch.optim.AdamW).parameters
         use_fused = fused_available and device_type == 'cuda'
