@@ -1,5 +1,8 @@
 # Copyright 2022 Microsoft Corporation.
 
+# adapted from https://github.com/microsoft/mup
+# in short, it has been largely simplified
+
 import os
 from copy import copy
 from itertools import product
