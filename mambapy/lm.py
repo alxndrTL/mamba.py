@@ -41,62 +41,66 @@ class LM(nn.Module):
         self.norm_f = RMSNorm(self.config.d_model, self.config.rms_norm_eps, self.config.mup)
 
         self.lm_head = nn.Linear(self.config.d_model, vocab_size, bias=False)
-        self.embedding.weight = self.lm_head.weight
+        # self.embedding.weight = self.lm_head.weight # weight-tying disabled
 
         # muP custom initialization
         if self.config.mup and isinstance(self.config, MambaConfig):
             for pn, p in self.named_parameters():
-                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_delta_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight', 'mixer.x_proj.weight']): # "hidden weights"
+                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight']): # # "hidden weights"
                     std = self.config.base_std
 
                     if 'mixer.out_proj.weight' in pn:
-                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layer which projects onto the residual stream (not muP related)
+                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layers which projects onto the residual stream (not muP related)
 
                     if 'mixer.dt_proj.weight' in pn:
                         std = self.config.dt_rank**-0.5 * self.config.dt_scale
-
                     torch.nn.init.normal_(p, mean=0.0, std=std / math.sqrt(self.config.mup_width_mult))
-                elif 'mixer.x_BC_proj.weight' in pn:
-                    torch.nn.init.zeros_(p[self.config.dt_rank:])
                 elif 'mixer.conv1d.weight' in pn:
                     torch.nn.init.zeros_(p)
                 elif pn == "embedding.weight":
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
-                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D']): # keep standard Mamba init for these params
+                elif pn == "lm_head.weight":
+                    torch.nn.init.zeros_(p)
+                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D']):
+                    # keep Mamba default init for these params
                     pass
                 else:
                     # here, we only have biases
                     assert p.dim() == 1, f"a 2d param ({pn}) has not been filtered out for init. please check."
 
-                    if "bias" in pn:
+                    if ("in_proj.bias" in pn) or ("out_proj.bias" in pn):
                         torch.nn.init.zeros_(p)
         
         elif self.config.mup and isinstance(self.config, Mamba2Config):
             for pn, p in self.named_parameters():
-                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight']): # "hidden weights"
+                
+                if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.out_proj.weight']): # # "hidden weights"
                     std = self.config.base_std
 
                     if 'mixer.out_proj.weight' in pn:
-                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layer which projects onto the residual stream (not muP related)
+                        std = std / math.sqrt(2 * self.config.n_layers) # scale down std of layers which projects onto the residual stream (not muP related)
 
-                    torch.nn.init.normal_(p, mean=0.0, std=std / math.sqrt(self.config.mup_width_mult))
+                    torch.nn.init.normal_(p, mean=0.0, std=std / math.sqrt(self.config.mup_width_mult))               
                 elif 'mixer.conv1d.weight' in pn:
                     torch.nn.init.zeros_(p)
                 elif pn == "embedding.weight":
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std)
-                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D', 'mixer.dt_bias']): # keep standard Mamba init for these params
+                elif pn == "lm_head.weight":
+                    torch.nn.init.zeros_(p)
+                elif any(pn.endswith(w) for w in ['mixer.A_log', 'mixer.D', 'mixer.dt_bias']):
+                    # keep Mamba default init for these params
                     pass
                 else:
                     # here, we only have biases
-                    assert p.dim() == 1, f"a 2d param has not been filtered out for init. please check."
+                    assert p.dim() == 1, f"a 2d param ({pn}) has not been filtered out for init. please check."
 
-                    if "bias" in pn:
+                    if ("in_proj.bias" in pn) or ("out_proj.bias" in pn):
                         torch.nn.init.zeros_(p)
 
         else:
             self.apply(self._init_weights)
             for pn, p in self.named_parameters():
-                if pn.endswith('fc_3.weight') or pn.endswith('c_proj.weight'):
+                if pn.endswith('mixer.out_proj.weight'):
                     torch.nn.init.normal_(p, mean=0.0, std=self.config.base_std/math.sqrt(2 * self.config.n_layers))
 
     def forward(self, tokens):
@@ -194,7 +198,7 @@ class LM(nn.Module):
         # create optim groups. Any parameters that is 2D will be weight decayed, otherwise no.
         # i.e. all weight tensors in matmuls + embeddings decay, all biases and layernorms don't.
         if self.config.mup and isinstance(self.config, MambaConfig):
-            mup_params_keys = set([pn for pn in param_dict.keys() if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_delta_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight', 'mixer.x_proj.weight'])])
+            mup_params_keys = set([pn for pn in param_dict.keys() if any(pn.endswith(w) for w in ['mixer.in_proj.weight', 'mixer.x_proj.weight', 'mixer.dt_proj.weight', 'mixer.out_proj.weight'])])
             
             dim2_params_keys = set([pn for pn in param_dict.keys() if param_dict[pn].dim() >= 2])
             dim2_params_keys = dim2_params_keys.difference(mup_params_keys)
@@ -224,7 +228,7 @@ class LM(nn.Module):
                 {'params': decay_params, 'weight_decay': weight_decay, 'lr': learning_rate},
                 {'params': nodecay_params, 'weight_decay': 0.0, 'lr': learning_rate}
             ]
-
+        
         else:
             decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
             nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
