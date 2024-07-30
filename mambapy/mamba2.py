@@ -3,7 +3,7 @@
 """
 
 adapted from https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba2_simple.py
-It justs implements a config similar to what's being done in mamba.py, as well as supports muP.
+It justs implements a config similar to what's being done in mamba.py.
 
 """
 
@@ -56,9 +56,6 @@ class Mamba2Config:
     bias: bool = False
     conv_bias: bool = True
 
-    mup: bool = False
-    mup_base_width: float = 128 # width=d_model
-
     chunk_size: int = 256
     use_mem_eff_path: bool = True
     dtype=None
@@ -70,10 +67,6 @@ class Mamba2Config:
         assert self.d_inner % self.d_head == 0
 
         assert (self.d_inner / self.d_head) % 8 == 0, "requierement of causal_conv1d"
-
-        # muP
-        if self.mup:
-            self.mup_width_mult = self.d_model / self.mup_base_width
 
 class Mamba2(nn.Module):
     def __init__(self, config: Mamba2Config):
@@ -110,7 +103,7 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.mixer = Mamba2Block(config)
-        self.norm = RMSNorm(config.d_model, config.rms_norm_eps, config.mup)
+        self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -159,7 +152,6 @@ class Mamba2Block(nn.Module):
             nn.init.uniform_(self.conv1d.weight, -self.config.conv_init, self.config.conv_init)
         # self.conv1d.weight._no_weight_decay = True
 
-        # todo : mup init + lr
         if self.config.learnable_init_states:
             self.init_states = nn.Parameter(torch.zeros(self.config.n_heads, self.config.d_head, self.config.d_state, **factory_kwargs))
             self.init_states._no_weight_decay = True
@@ -275,20 +267,12 @@ class Mamba2Block(nn.Module):
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):
-    def __init__(self, d_model: int, eps: float = 1e-5, use_mup: bool = False):
+    def __init__(self, d_model: int, eps: float = 1e-5):
         super().__init__()
 
-        self.use_mup = use_mup
         self.eps = eps
-
-        # https://arxiv.org/abs/2404.05728, RMSNorm gains prevents muTransfer (section 4.2.3)
-        if not use_mup:
-            self.weight = nn.Parameter(torch.ones(d_model))
+        self.weight = nn.Parameter(torch.ones(d_model))
 
     def forward(self, x):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-
-        if not self.use_mup:
-            return output * self.weight
-        else:
-            return output
+        return output * self.weight
