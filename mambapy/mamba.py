@@ -50,6 +50,9 @@ class MambaConfig:
     conv_bias: bool = True
     inner_layernorms: bool = False # apply layernorms to internal activations
 
+    mup: bool = False
+    mup_base_width: float = 128 # width=d_model
+
     pscan: bool = True # use parallel scan mode or sequential mode when training
     use_cuda: bool = False # use official CUDA implementation when training (not compatible with (b)float16)
 
@@ -58,6 +61,10 @@ class MambaConfig:
 
         if self.dt_rank == 'auto':
             self.dt_rank = math.ceil(self.d_model / 16)
+
+        # muP
+        if self.mup:
+            self.mup_width_mult = self.d_model / self.mup_base_width
 
 class Mamba(nn.Module):
     def __init__(self, config: MambaConfig):
@@ -94,7 +101,7 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.mixer = MambaBlock(config)
-        self.norm = RMSNorm(config.d_model, config.rms_norm_eps)
+        self.norm = RMSNorm(config.d_model, config.rms_norm_eps, config.mup)
 
     def forward(self, x):
         # x : (B, L, D)
@@ -170,9 +177,9 @@ class MambaBlock(nn.Module):
 
         # used in jamba
         if self.config.inner_layernorms:
-            self.dt_layernorm = RMSNorm(self.config.dt_rank, config.rms_norm_eps)
-            self.B_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
-            self.C_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps)
+            self.dt_layernorm = RMSNorm(self.config.dt_rank, config.rms_norm_eps, config.mup)
+            self.B_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps, config.mup)
+            self.C_layernorm = RMSNorm(self.config.d_state, config.rms_norm_eps, config.mup)
         else:
             self.dt_layernorm = None
             self.B_layernorm = None
@@ -407,13 +414,21 @@ class MambaBlock(nn.Module):
         return y, h
 
 class RMSNorm(nn.Module):
-    def __init__(self, d_model: int, eps: float = 1e-5):
+    def __init__(self, d_model: int, eps: float = 1e-5, use_mup: bool = False):
         super().__init__()
 
+        self.use_mup = use_mup
         self.eps = eps
-        self.weight = nn.Parameter(torch.ones(d_model))
+
+        # https://arxiv.org/abs/2404.05728, RMSNorm gains prevents muTransfer (section 4.2.3)
+        if not use_mup:
+            self.weight = nn.Parameter(torch.ones(d_model))
 
     def forward(self, x):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
-        return output * self.weight
+        if not self.use_mup:
+            return output * self.weight
+        else:
+            return output
+    
