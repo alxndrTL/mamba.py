@@ -136,13 +136,31 @@ If you want a full training example (like in llama2.c), you can check the [othel
 
 muP makes it possible by initializing and scaling the learning rates of the weights the model in a specific way. This is the result of these modifications:
 
-[coord check]
+<p align="center">
+    <img src="assets/coord_check_mamba2_mup.png" alt="a python and a mamba" 
+    width="1200" height="200" alt="python mamba"/>
+</p>
 
-SP is stand parametrization, and muP is maximal update parametrization.
+Without muP, what we get is :
 
-For each training step (t=0, 1..., 5)
+<p align="center">
+    <img src="assets/coord_check_mamba2_no_mup.png" alt="a python and a mamba" 
+    width="1200" height="200" alt="python mamba"/>
+</p>
 
-[TOOD: finish writing this section]
+What we see here are the scale of the activations for various widths (d_model) starting at t=1 (initialization) to t=5 (5 steps of training). With SP (standard parametrization), the activations of the network are greatly vary with width, whereas they stay constant with width under muP.
+And intuitively, if the activations (the "signals") of the network behave the same no matter the width, one can easily imagine that the optimal HP is thus independent of the width.
+
+And this is what we observe in practice when we sweep for the optimal LR :
+
+<p align="center">
+    <img src="assets/sweep_mamba2.png" alt="a python and a mamba" 
+    width="900" height="340" alt="python mamba"/>
+</p>
+
+The optimal LR shifts with bigger models under SP, whereas, with muP, it stays roughly constant. The smaller model has only 172k params, while the bigger has over 100M!
+
+For more information about muP in general, you can take a look at the [paper](https://arxiv.org/abs/2203.03466), and to see my derivation of the muP implementation for Mamba, and what it changes concretly in code, please see the [associated PR](https://github.com/alxndrTL/mamba.py/pull/50).
 
 ___
 ## Performances
