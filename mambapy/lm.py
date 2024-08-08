@@ -17,9 +17,6 @@ import torch.nn.functional as F
 from mambapy.mamba import Mamba, MambaConfig, RMSNorm
 from mambapy.mamba2 import Mamba2, Mamba2Config
 
-# TODO generate function : batch size != 1 ? (for now B=1)
-# TODO generate function : top-p sampling
-
 class LM(nn.Module):
     def __init__(self, model_config: Union[MambaConfig, Mamba2Config], vocab_size: int, pad_vocab_size_multiple: int = None):
         super().__init__()
@@ -157,54 +154,38 @@ class LM(nn.Module):
         
         return generated.to(input_device)[:, -num_tokens:]
     
-    def generate4(self, prompts, num_tokens: List[int], sample: bool = True, top_k: int = None, temperature: float = 1.0):
-        # prompts : list of B x (L) tensors
+    def generate4(self, prompt, num_tokens: int, sample: bool = True, top_k: int = None, temperature: float = 1.0):
+        # prompt : (1, L)
 
-        B = len(prompts)
-        min_len = min(prompt.size(0) for prompt in prompts)
-        max_len = max(prompt.size(0) for prompt in prompts)
-
-        max_num_tokens = max(num_tokens)
-
-        assert not isinstance(self.core, Mamba), "Mamba1 doesn't support decoding with the generate4 function."
+        assert not isinstance(self.core, Mamba), "Mamba1 doesn't support decoding with the generate3 function."
         if isinstance(self.core, Mamba2):
-            assert self.config.use_mem_eff_path, "Mamba2 should use the mem_eff_path when decoding with the generate4 function"
-            assert min_len >= self.config.d_conv
-            
+            assert self.config.use_mem_eff_path, "Mamba2 should use the mem_eff_path when decoding with the generate3 function"
+            assert prompt.size(1) >= self.config.d_conv
+
         if top_k is not None:
             top_k = min(top_k, self.vocab_size)
 
-        input_device = prompts[0].device
+        input_device = prompt.device
         model_device = self.embedding.weight.device
-        
-        self.eval()
-        
-        padded_prompts = [F.pad(prompt, (0, max_len-prompt.size(0))) for prompt in prompts]
-        padded_prompts = torch.stack(padded_prompts) # to : model_device?
-        
-        batched_generated = torch.zeros(B, max_len+max_num_tokens, dtype=torch.long, device=model_device)
-        batched_generated[:, :max_len] = padded_prompts
 
-        """
-        active_mask = torch.arange(max_len).unsqueeze(0) < torch.tensor([p.size(0) for p in prompts]).unsqueeze(1)
-        active_mask = active_mask.to(model_device)
-        """
-        prompt_lengths = torch.tensor([p.size(0) for p in prompts], device=input_device)
-        position_ids = torch.arange(max_len+max_num_tokens, device=input_device).unsqueeze(0).expand(B, -1)
-        active_mask = position_ids < prompt_lengths.unsqueeze(1)
-        active_mask = active_mask.to(model_device)
+        prompt = prompt.to(model_device)
+
+        self.eval()
+
+        len_prompt = prompt.size(1)
+        generated = prompt.clone()
 
         # caches is a list of cache, one per layer
         # cache is composed of : - if Mamba(2) layer : the hidden state, and the last d_conv-1 inputs (see more in mamba_lm.py)
         #                        - if attention layer : the KV cache, ie 2 tensors of shape (B, num_kv_heads, L, head_dim)
-        caches = [layer.get_empty_cache(min_len) for layer in self.core.layers]
+        caches = [layer.get_empty_cache(prompt.size(0)) for layer in self.core.layers]
 
         with torch.no_grad():
             # process prompt in one go
-            logits, caches = self.forward(batched_generated[:, :min_len], caches) # (B, L, vocab_size)
+            logits, caches = self.forward(prompt, caches) # (B, L, vocab_size)
             next_token_logits = logits[:, -1] # (B, vocab_size)
 
-            for t in range(min_len, max_len+max_num_tokens):
+            for t in range(num_tokens):
                 if sample:
                     probs = F.softmax(next_token_logits / temperature, dim=-1)
 
@@ -217,18 +198,12 @@ class LM(nn.Module):
                 else:
                     next_token = next_token_logits.argmax(dim=-1, keepdim=True) # (B, 1)
 
-                # here, choose if modify batched_generated[:, t] with next_token or leave it as is
-
-                update_mask = ~active_mask[:, t]
-                batched_generated[:, t] = torch.where(update_mask, next_token.squeeze(1), batched_generated[:, t])
-
-                next_token_logits, caches = self.forward(batched_generated[:, [t]], caches, seq_pos=t) # (B, 1, vocab_size), caches
+                generated = torch.cat([generated, next_token], dim=1)
+                next_token_logits, caches = self.forward(generated[:, [len_prompt+t]], caches, seq_pos=len_prompt+t) # (B, 1, vocab_size), caches
                 next_token_logits = next_token_logits.squeeze(1) # (B, vocab_size)
 
         self.train()
-
-        generated = [seq[prompts[i].size(0):prompts[i].size(0) + nt].to(input_device) for i, (seq, nt) in enumerate(zip(batched_generated, num_tokens))]
-        return generated
+        return generated.to(input_device)[:, -num_tokens:]
     
     """
     def step(self, token, caches):
