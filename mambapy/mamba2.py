@@ -1,9 +1,29 @@
-# Copyright (c) 2024, Tri Dao, Albert Gu.
-
 """
 
 adapted from https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba2_simple.py
-It justs implements a config similar to what's being done in mamba.py, as well as supports muP.
+It implements a caching mecanism, a config similar to what's being done in mamba.py, as well as supports muP.
+
+When passing an input of length 1 in the forward function, the model automatically routes the call to the step function.
+This step function does one "classic" RNN-like step of computation, using the input and the cache provided. It returns the output as well as the new cache.
+This is used for inference, to generate tokens one by one.
+
+Also, this model supports prefilling a prompt and decoding token by token : this is just a mix of forwarding (in parallel) the input, and then decoding step by step.
+In order to do that, we need the forward/parallel call (also used in training) to output the cache, then used to start the step by step decoding part.
+To use this mode, you need to call Mamba2.forward() with your input (of shape (B, L, D)) as well as with a non-None cache (like full zeros, it doesnt matter, just not "None").
+The forward call will thus return the output and the cache. From there, you can start your step by step decoding (see just above).
+
+The cache is composed of two objects :
+-h_cache: the last hidden state. Just like an RNN : you have to keep track of only the last h.
+-conv_state: because Mamba2 uses a convolution over the time sequence, with a filter of length d_conv=4, you have to keep the last d_conv-1=3 inputs of that convolution to be able to run it provided a new input.
+
+h_cache is of shape (B, n_heads, d_head, N) and is initialized at 0 (if no starting hidden state, which is the default behavior in Mamba).
+conv_state is of shape (B, EDN * 2*n_groups*, d_conv) and is initialized at 0
+
+(B=batch_size, L=seq len, E = expand_factor, D=d_model, N=d_state)
+
+
+
+(TODO: make it full pytorch (ie translate mamba_chunk_scan_combined in pytorch))
 
 """
 
@@ -18,17 +38,21 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 
 try:
-    from causal_conv1d import causal_conv1d_fn
+    from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
 except ImportError:
-    causal_conv1d_fn = None
+    causal_conv1d_fn, causal_conv1d_update = None, None
 
 try:
     from mamba_ssm.ops.triton.layernorm_gated import RMSNorm as RMSNormGated, LayerNorm
+
+    from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined, mamba_split_conv1d_scan_combined
+    from mamba_ssm.ops.triton.selective_state_update import selective_state_update
+    
 except ImportError:
     RMSNormGated, LayerNorm = None, None
 
-from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined
-from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv1d_scan_combined
+    mamba_chunk_scan_combined, mamba_split_conv1d_scan_combined = None, None
+    selective_state_update = None
 
 @dataclass
 class Mamba2Config:
@@ -83,55 +107,44 @@ class Mamba2(nn.Module):
 
         self.layers = nn.ModuleList([ResidualBlock(config) for _ in range(config.n_layers)])
 
-    def forward(self, x):
+    def forward(self, x, caches=None):
         # x : (B, L, D)
 
         # y : (B, L, D)
 
-        for layer in self.layers:
-            x = layer(x)
-
-        return x
-    
-    def step(self, x, caches):
-        # x : (B, L, D)
-        # caches : [cache(layer) for all layers], cache : (h, inputs)
-
-        # y : (B, L, D)
-        # caches : [cache(layer) for all layers], cache : (h, inputs)
+        if caches is None:
+            caches = [None] * self.config.n_layers
 
         for i, layer in enumerate(self.layers):
-            x, caches[i] = layer.step(x, caches[i])
+            x, caches[i] = layer(x, caches[i])
 
-        return x, caches
+        if caches[0] == None:
+            return x
+        else:
+            return x, caches
 
 class ResidualBlock(nn.Module):
     def __init__(self, config: Mamba2Config):
         super().__init__()
+        
+        self.config = config
 
-        self.mixer = Mamba2Block(config)
-        self.norm = RMSNorm(config.d_model, config.rms_norm_eps, config.mup)
+        self.mixer = Mamba2Block(self.config)
+        self.norm = RMSNorm(self.config.d_model, self.config.rms_norm_eps, self.config.mup)
 
-    def forward(self, x):
+    def forward(self, x, cache=None):
         # x : (B, L, D)
 
         # output : (B, L, D)
 
-        output = self.mixer(self.norm(x)) + x
-        return output
-    
-    def step(self, x, cache):
-        # x : (B, D)
-        # cache : (h, inputs)
-                # h : (B, ED, N)
-                # inputs: (B, ED, d_conv-1)
-
-        # output : (B, D)
-        # cache : (h, inputs)
-
-        output, cache = self.mixer.step(self.norm(x), cache)
+        output, cache = self.mixer(self.norm(x), cache)
         output = output + x
         return output, cache
+    
+    def get_empty_cache(self, batch_size):
+        h_cache = torch.zeros(batch_size, self.config.n_heads, self.config.d_head, self.config.d_state, device=self.mixer.in_proj.weight.device, dtype=self.mixer.in_proj.weight.dtype)
+        conv_cache = torch.zeros(batch_size, self.mixer.conv1d.weight.shape[0], self.config.d_conv, device=self.mixer.conv1d.weight.device, dtype=self.mixer.conv1d.weight.dtype)
+        return (h_cache, conv_cache)
 
 class Mamba2Block(nn.Module):
     def __init__(self, config: Mamba2Config):
@@ -197,13 +210,22 @@ class Mamba2Block(nn.Module):
 
         self.out_proj = nn.Linear(self.config.d_inner, self.config.d_model, bias=self.config.bias, **factory_kwargs)
 
-    def forward(self, u, seq_idx=None):
+    def forward(self, u, cache=None, seq_idx=None):
         """
         u: (B, L, D)
-        Returns: same shape as u
+        Returns: out : same shape as u
         """
 
-        batch, seqlen, dim = u.shape
+        batch, length, _ = u.shape
+
+        return_cache = False
+        if cache is not None and length > 1:
+            cache = None
+            return_cache = True
+        
+        if cache is not None:
+            out, cache = self.step(u, cache)
+            return out, cache
 
         zxbcdt = self.in_proj(u)  # (B, L, d_in_proj)
         A = -torch.exp(self.A_log)  # (nheads) or (d_inner, d_state)
@@ -230,8 +252,20 @@ class Mamba2Block(nn.Module):
                 ngroups=self.config.n_groups,
                 norm_before_gate=False,
                 initial_states=initial_states,
+                return_final_states=return_cache,
                 **dt_limit_kwargs,
             )
+
+            if return_cache:
+                # get h_cache from output
+                out, h_cache = out
+
+                # compute conv_cache with last d_conv entries of xBC
+                _, xBC, _ = torch.split(zxbcdt, [self.config.d_inner, self.config.d_inner + 2 * self.config.n_groups * self.config.d_state, self.config.n_heads], dim=-1)
+                conv_cache = xBC[:, -self.config.d_conv:].transpose(1, 2) # (error if seqlen<d_conv)
+
+                cache = (h_cache, conv_cache)
+
         else:
             z, xBC, dt = torch.split(
                 zxbcdt, [self.config.d_inner, self.config.d_inner + 2 * self.config.n_groups * self.config.d_state, self.config.n_heads], dim=-1
@@ -271,7 +305,67 @@ class Mamba2Block(nn.Module):
             # Multiply "gate" branch and apply extra normalization layer
             y = self.norm(y, z)
             out = self.out_proj(y)
-        return out
+        return out, cache
+    
+    def step(self, u, cache):
+        """
+        u: (B, 1, D)
+        cache: (h_cache, conv_cache)
+        """
+        
+        h_cache, conv_cache = cache
+
+        zxbcdt = self.in_proj(u.squeeze(1))  # (B, 2D)
+        d_mlp = (zxbcdt.shape[-1] - 2 * self.config.d_inner - 2 * self.config.n_groups * self.config.d_state - self.config.n_heads) // 2
+        z0, x0, z, xBC, dt = torch.split(zxbcdt, [d_mlp, d_mlp, self.config.d_inner, self.config.d_inner + 2 * self.config.n_groups * self.config.d_state, self.config.n_heads], dim=-1)
+
+        # conv step
+        if causal_conv1d_update is None:
+            conv_cache.copy_(torch.roll(conv_cache, shifts=-1, dims=-1)) # update state (B, D, W)
+            conv_cache[:, :, -1] = xBC
+            xBC = torch.sum(conv_cache * rearrange(self.conv1d.weight, "d 1 w -> d w"), dim=-1) # (B, D)
+            if self.conv1d.bias is not None:
+                xBC = xBC + self.conv1d.bias
+            xBC = self.act(xBC).to(dtype=x.dtype)
+        else:
+            xBC = causal_conv1d_update(xBC, conv_cache, rearrange(self.conv1d.weight, "d 1 w -> d w"), self.conv1d.bias, self.config.activation)
+        x, B, C = torch.split(xBC, [self.config.d_inner, self.config.n_groups * self.config.d_state, self.config.n_groups * self.config.d_state], dim=-1)
+        A = -torch.exp(self.A_log.float()) # (n_heads)
+
+        # SSM step
+        if selective_state_update is None:
+            assert self.config.n_groups == 1, "Only support ngroups=1 for this inference code path"
+            # discretize A
+            dt = F.softplus(dt + self.dt_bias.to(dtype=dt.dtype))  # (B, n_heads)
+            dA = torch.exp(dt * A)  # (B, n_heads)
+            # discretize B
+            x = rearrange(x, "b (h p) -> b h p", p=self.config.d_head)
+            dBx = torch.einsum("bh,bn,bhp->bhpn", dt, B, x)
+            # compute one step
+            h_cache.copy_(h_cache * rearrange(dA, "b h -> b h 1 1") + dBx)
+            # compute output
+            y = torch.einsum("bhpn,bn->bhp", h_cache.to(x.dtype), C)
+            y = y + rearrange(self.D.to(x.dtype), "h -> h 1") * x
+            y = rearrange(y, "b h p -> b (h p)")
+        
+        else:
+            A = repeat(A, "h -> h p n", p=self.config.d_head, n=self.config.d_state).to(dtype=torch.float32)
+            dt = repeat(dt, "b h -> b h p", p=self.config.d_head)
+            dt_bias = repeat(self.dt_bias, "h -> h p", p=self.config.d_head)
+            D = repeat(self.D, "h -> h p", p=self.config.d_head)
+            B = rearrange(B, "b (g n) -> b g n", g=self.config.n_groups)
+            C = rearrange(C, "b (g n) -> b g n", g=self.config.n_groups)
+            x_reshaped = rearrange(x, "b (h p) -> b h p", p=self.config.d_head)
+            
+            y = selective_state_update(h_cache, x_reshaped, dt, A, B, C, D, z=None, dt_bias=dt_bias, dt_softplus=True)
+            y = rearrange(y, "b h p -> b (h p)")
+        
+        #if self.rmsnorm:
+        y = self.norm(y, z)
+        if d_mlp > 0:
+            y = torch.cat([F.silu(z0) * x0, y], dim=-1)
+        out = self.out_proj(y)
+        return out.unsqueeze(1), (h_cache, conv_cache)
 
 # taken straight from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
 class RMSNorm(nn.Module):

@@ -5,7 +5,7 @@ It has an embedding layer, and a LM head which maps the model output to logits.
 
 """
 
-from typing import Union
+from typing import Union, List
 import inspect
 import json
 import math
@@ -119,6 +119,118 @@ class LM(nn.Module):
 
         return logits
     
+    def generate(self, prompt, num_tokens: int, sample: bool = True, top_k: int = None, temperature: float = 1.0):
+        # prompt : (B, L)
+
+        # generation : (B, l)
+
+        # L>>l
+
+        if top_k is not None:
+            top_k = min(top_k, self.vocab_size)
+        
+        input_device = prompt.device
+        prompt = prompt.to(self.embedding.weight.device)
+
+        self.eval()
+        generated = prompt.clone()
+
+        with torch.no_grad():
+            for _ in range(num_tokens):
+                logits = self.forward(generated) # (B, L, vocab_size)
+                next_token_logits = logits[:, -1]
+
+                if sample:
+                    probs = F.softmax(next_token_logits / temperature, dim=-1)
+                    
+                    if top_k is not None:
+                        values, _ = torch.topk(probs, k=top_k) # (B, k) ordered from lowest to biggest
+                        probs[probs < values[:, -1, None]] = 0 # zero-out all probs except the k first
+                        probs = probs / probs.sum(axis=1, keepdims=True)
+
+                    next_token = torch.multinomial(probs, num_samples=1)
+                else:
+                    next_token = next_token_logits.argmax(dim=-1, keepdim=True)
+                generated = torch.cat([generated, next_token], dim=1)
+        
+        self.train()
+        
+        return generated.to(input_device)[:, -num_tokens:]
+    
+    def generate4(self, prompts, num_tokens: List[int], sample: bool = True, top_k: int = None, temperature: float = 1.0):
+        # prompts : list of B x (L) tensors
+
+        B = len(prompts)
+        min_len = min(prompt.size(0) for prompt in prompts)
+        max_len = max(prompt.size(0) for prompt in prompts)
+
+        max_num_tokens = max(num_tokens)
+
+        assert not isinstance(self.core, Mamba), "Mamba1 doesn't support decoding with the generate4 function."
+        if isinstance(self.core, Mamba2):
+            assert self.config.use_mem_eff_path, "Mamba2 should use the mem_eff_path when decoding with the generate4 function"
+            assert min_len >= self.config.d_conv
+            
+        if top_k is not None:
+            top_k = min(top_k, self.vocab_size)
+
+        input_device = prompts[0].device
+        model_device = self.embedding.weight.device
+        
+        self.eval()
+        
+        padded_prompts = [F.pad(prompt, (0, max_len-prompt.size(0))) for prompt in prompts]
+        padded_prompts = torch.stack(padded_prompts) # to : model_device?
+        
+        batched_generated = torch.zeros(B, max_len+max_num_tokens, dtype=torch.long, device=model_device)
+        batched_generated[:, :max_len] = padded_prompts
+
+        """
+        active_mask = torch.arange(max_len).unsqueeze(0) < torch.tensor([p.size(0) for p in prompts]).unsqueeze(1)
+        active_mask = active_mask.to(model_device)
+        """
+        prompt_lengths = torch.tensor([p.size(0) for p in prompts], device=input_device)
+        position_ids = torch.arange(max_len+max_num_tokens, device=input_device).unsqueeze(0).expand(B, -1)
+        active_mask = position_ids < prompt_lengths.unsqueeze(1)
+        active_mask = active_mask.to(model_device)
+
+        # caches is a list of cache, one per layer
+        # cache is composed of : - if Mamba(2) layer : the hidden state, and the last d_conv-1 inputs (see more in mamba_lm.py)
+        #                        - if attention layer : the KV cache, ie 2 tensors of shape (B, num_kv_heads, L, head_dim)
+        caches = [layer.get_empty_cache(min_len) for layer in self.core.layers]
+
+        with torch.no_grad():
+            # process prompt in one go
+            logits, caches = self.forward(batched_generated[:, :min_len], caches) # (B, L, vocab_size)
+            next_token_logits = logits[:, -1] # (B, vocab_size)
+
+            for t in range(min_len, max_len+max_num_tokens):
+                if sample:
+                    probs = F.softmax(next_token_logits / temperature, dim=-1)
+
+                    if top_k is not None:
+                        values, _ = torch.topk(probs, k=top_k) # (B, k) ordered from lowest to biggest
+                        probs[probs < values[:, -1, None]] = 0 # zero-out all probs except the k first
+                        probs = probs / probs.sum(axis=1, keepdims=True)
+
+                    next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
+                else:
+                    next_token = next_token_logits.argmax(dim=-1, keepdim=True) # (B, 1)
+
+                # here, choose if modify batched_generated[:, t] with next_token or leave it as is
+
+                update_mask = ~active_mask[:, t]
+                batched_generated[:, t] = torch.where(update_mask, next_token.squeeze(1), batched_generated[:, t])
+
+                next_token_logits, caches = self.forward(batched_generated[:, [t]], caches, seq_pos=t) # (B, 1, vocab_size), caches
+                next_token_logits = next_token_logits.squeeze(1) # (B, vocab_size)
+
+        self.train()
+
+        generated = [seq[prompts[i].size(0):prompts[i].size(0) + nt].to(input_device) for i, (seq, nt) in enumerate(zip(batched_generated, num_tokens))]
+        return generated
+    
+    """
     def step(self, token, caches):
         # token : (B)
         # caches : [cache(layer) for all layers], cache : (h, inputs)
@@ -180,6 +292,7 @@ class LM(nn.Module):
             return outputs[0]
         else:
             return outputs
+    """
     
     # non-muP init (taken from llama2.c)
     def _init_weights(self, module):
