@@ -157,9 +157,9 @@ class LM(nn.Module):
     def generate4(self, prompt, num_tokens: int, sample: bool = True, top_k: int = None, temperature: float = 1.0):
         # prompt : (1, L)
 
-        assert not isinstance(self.core, Mamba), "Mamba1 doesn't support decoding with the generate3 function."
+        assert not isinstance(self.core, Mamba), "Mamba1 doesn't support decoding with the generate4 function."
         if isinstance(self.core, Mamba2):
-            assert self.config.use_mem_eff_path, "Mamba2 should use the mem_eff_path when decoding with the generate3 function"
+            assert self.config.use_mem_eff_path, "Mamba2 should use the mem_eff_path when decoding with the generate4 function"
             assert prompt.size(1) >= self.config.d_conv
 
         if top_k is not None:
