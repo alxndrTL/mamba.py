@@ -236,3 +236,17 @@ perfs related:
 ~~- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).~~
 - reduce the memory usage somehow (at the cost of speed if needed)
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>
+
+## Citation
+
+If you find this project useful in your research and wish to cite it, please use the following BibTex entry:
+
+```
+@software{mambapy,
+  author = {Alexandre Torres},
+  title = {mamba.py: A simple, hackable and efficient Mamba implementation in pure PyTorch and MLX.},
+  url = {https://github.com/alxndrTL/mamba.py},
+  version = {1.0},
+  year = {2024},
+}
+```
