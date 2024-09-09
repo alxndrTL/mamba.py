@@ -1,7 +1,10 @@
 """
 
 adapted from https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba2_simple.py
-It implements a caching mecanism, a config similar to what's being done in mamba.py, as well as supports muP.
+It implements a Mamba2 model BUT still relies on the official Triton code for Mamba2.
+(Coming soon hopefully is a full torch version, like in mamba.py and pscan.py)
+
+Also, the file implements a caching mecanism, and a config similar to what's being done in mamba.py, as well as supports muP.
 
 When passing an input of length 1 in the forward function, the model automatically routes the call to the step function.
 This step function does one "classic" RNN-like step of computation, using the input and the cache provided. It returns the output as well as the new cache.

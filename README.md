@@ -243,7 +243,7 @@ If you find this project useful in your research and wish to cite it, please use
 
 ```
 @software{mambapy,
-  author = {Alexandre Torres},
+  author = {Alexandre Torres--Leguet},
   title = {mamba.py: A simple, hackable and efficient Mamba implementation in pure PyTorch and MLX.},
   url = {https://github.com/alxndrTL/mamba.py},
   version = {1.0},
