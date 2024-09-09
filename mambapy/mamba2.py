@@ -16,7 +16,7 @@ The cache is composed of two objects :
 -h_cache: the last hidden state. Just like an RNN : you have to keep track of only the last h.
 -conv_state: because Mamba2 uses a convolution over the time sequence, with a filter of length d_conv=4, you have to keep the last d_conv-1=3 inputs of that convolution to be able to run it provided a new input.
 
-h_cache is of shape (B, n_heads, d_head, N) and is initialized at 0 (if no starting hidden state, which is the default behavior in Mamba).
+h_cache is of shape (B, n_heads, d_head, N) and is initialized at 0 (ie no starting hidden state, which is the default behavior in Mamba).
 conv_state is of shape (B, EDN * 2*n_groups*, d_conv) and is initialized at 0
 
 (B=batch_size, L=seq len, E = expand_factor, D=d_model, N=d_state)
