@@ -374,7 +374,7 @@ def from_pretrained(name: str):
         
     # copy config data
     config_data = load_config_hf(name)
-    config = MambaConfig(d_model=config_data['d_model'], n_layers=config_data['n_layers'])
+    config = MambaConfig(d_model=config_data['d_model'], n_layers=config_data['n_layer'])
     model = LM(config, config_data['vocab_size'])
 
     # copy weights
