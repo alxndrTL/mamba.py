@@ -126,6 +126,11 @@ class Mamba2(nn.Module):
         else:
             return x, caches
 
+    def step(self, x, caches):
+        for i, layer in enumerate(self.layers):
+            x, caches[i] = layer.step(x, caches[i])
+        return x, caches
+
 class ResidualBlock(nn.Module):
     def __init__(self, config: Mamba2Config):
         super().__init__()
@@ -143,6 +148,11 @@ class ResidualBlock(nn.Module):
         output, cache = self.mixer(self.norm(x), cache)
         output = output + x
         return output, cache
+
+    def step(self, x, cache):
+        out, cache = self.mixer.step(self.norm(x).unsqueeze(1), cache)
+        out = out.squeeze(1) + x
+        return out, cache
     
     def get_empty_cache(self, batch_size):
         h_cache = torch.zeros(batch_size, self.config.n_heads, self.config.d_head, self.config.d_state, device=self.mixer.in_proj.weight.device, dtype=self.mixer.in_proj.weight.dtype)
