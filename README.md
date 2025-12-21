@@ -1,9 +1,11 @@
 # mamba.py 🐍 : a simple and efficient Mamba implementation
 A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in PyTorch with a simple parallel scan implementation, offering an major speedup over a sequential implementation, as the parallel scan allows the parallelization over the time dimension.
-It combines the ease of read with good performances when training. [Jamba](https://www.ai21.com/blog/announcing-jamba) is also supported.
+It combines the ease of read with good performances when training. Few other functionalities are implemented, like [Jamba](https://www.ai21.com/blog/announcing-jamba), [Vision Mamba](https://arxiv.org/abs/2401.09417) as well as [muP](https://arxiv.org/abs/2203.03466).
 
 ## Updates
-- <b>27/06/2024</b> : Deployed a package version of `mamba.py` on PyPI, which you can install with `pip install mambapy`. This is done in order to integrate the library in transformers 🤗.
+- <b>03/08/2024</b> : Added a muP implementation for Mamba and Mamba2. This allows to sweep for optimal hyperparameters on a small model and directly transfer them to a large model. See [this PR](https://github.com/alxndrTL/mamba.py/pull/50)
+- <b>23/07/2024</b> : `mamba.py` is now part of the transformers 🤗 library. See [this PR](https://github.com/huggingface/transformers/pull/30139).
+- <b>27/06/2024</b> : Deployed a package version of `mamba.py` on PyPI, which you can install with `pip install mambapy`.
 
 - <b>21/04/2024</b> : Added the `jamba.py` file, which implements the [Jamba](https://www.ai21.com/blog/announcing-jamba) architecture (mix of Mamba and attention layers). Also added as a possible backend the official CUDA implementation.
 
@@ -31,13 +33,16 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
 - `📁 mambapy` : the PyTorch implementation of Mamba
     - `pscan.py` : a PyTorch implementation of Blelloch's parallel scan
     - `mamba.py` : the Mamba model, as described in the [paper](https://arxiv.org/abs/2312.00752). It is numerically equivalent (initialization, forward and backward pass).
-    - `mamba_lm.py` : encapsulates a Mamba model in order to use it as a language model
-    - `jamba.py` : a clean implementation of the Jamba model in PyTorch
+    - `mamba2.py` (beta) : the Mamba-2 model, as described in the [paper](https://arxiv.org/abs/2405.21060). It requieres CUDA as it is only adapted from the original version. (for now)
+    - `lm.py` : encapsulates a Mamba(-2) model in order to use it as a language model
+    - `jamba.py` : an implementation of the [Jamba](https://www.ai21.com/blog/announcing-jamba) model in PyTorch
     - `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
     - `📁 onnx` : export a trained Mamba model in ONNX for inference.
 - `📁 mlx` : basically the same code as above, but in MLX.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan for now.
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch as well as a training file.
+
+[muP](https://arxiv.org/abs/2203.03466) is implemented and compatible with both the Mamba models (see below for more details).
 
 ## Usage
 
@@ -60,23 +65,26 @@ y = model(x)
 assert y.shape == x.shape
 ```
 
-The class `MambaLM` ([mamba_lm.py](mamba_lm.py)) builds on the `Mamba` object and offers a classic API for language models. It can be used as follows :
+You can also use Mamba-2 by importing the `Mamba2Config` and `Mamba2` objectfs from `mamba2.py`.
+
+
+The class `LM` ([lm.py](lm.py)) builds on the `Mamba` or `Mamba-2` objects and offers a classic API for language models. It can be used as follows :
 
 ```python
-from mambapy.mamba_lm import MambaLM, MambaLMConfig
+from mambapy.lm import LM, MambaConfig
 
-config = MambaLMConfig(d_model=16, n_layers=4, vocab_size=32000)
-model = MambaLM(config)
+config = MambaConfig(d_model=16, n_layers=4) # core model
+model = MambaLM(config, vocab_size=32000) # encapsulate it in a LM
 
 x = torch.randint(high=32000, size=(16, 64))
 logits = model(x) # (B, L, vocab_size)
 ```
 
-It simply encapsulates a `Mamba` object with an embedding layer, a final normalization and a language modeling head.
+It simply encapsulates a `Mamba(-2)` object with an embedding layer, a final normalization and a language modeling head.
 
 You can use it off the shelf with a pretrained Mamba model :
 ```python
-from mambapy.mamba_lm import from_pretrained
+from mambapy.lm import from_pretrained
 from transformers import AutoTokenizer
 
 model = from_pretrained('state-spaces/mamba-130m').to("cuda")
@@ -118,11 +126,42 @@ output = model.generate(tokenizer, "def min(arr):")
 ```
 
 ## `📁 examples`
-There are two basics examples available :
+There are two basics examples available (some may be outdated):
 - `example_llm.ipynb` : load a Mamba model with pretrained weights (from 130M to 2.8B from HuggingFace)
 - `example_e2e_training.ipynb` : an end-to-end training example where a Mamba model is employed as a world model for a simple 3-3 grid game (training is not completed, the model should be larger).
 
 If you want a full training example (like in llama2.c), you can check the [othello_mamba repo](https://github.com/alxndrTL/othello_mamba) I've done. With this repo, you can train a Mamba or a Jamba from scratch, use `bfloat16`, easily swipe it with a Transformer, come up with your own data, etc ...
+
+## muP
+[muP](https://arxiv.org/abs/2203.03466) is a technique that allows to transfer hyperparameters (like the learning rate) from small to very large models. For example, it is [possible](https://arxiv.org/abs/2404.05728) to transfer (ie, use the same) the learning rate from a 2M model to a 10B model. This is extremely useful in practice when doing hyperparameters search : you just do sweeps to find the bests HPs on your small model, which is fast and inexpensive, and you automatically have the best performing HPs for your large model.
+
+muP makes it possible by initializing and scaling the learning rates of the weights the model in a specific way. This is the result of these modifications:
+
+<p align="center">
+    <img src="assets/coord_check_mamba2_mup.png" alt="a python and a mamba" 
+    width="1200" height="200" alt="python mamba"/>
+</p>
+
+Without muP, what we get is :
+
+<p align="center">
+    <img src="assets/coord_check_mamba2_no_mup.png" alt="a python and a mamba" 
+    width="1200" height="200" alt="python mamba"/>
+</p>
+
+What we see here are the scale of the activations for various widths (d_model) starting at t=1 (initialization) to t=5 (5 steps of training). With SP (standard parametrization), the activations of the network are greatly vary with width, whereas they stay constant with width under muP.
+And intuitively, if the activations (the "signals") of the network behave the same no matter the width, one can easily imagine that the optimal HP is thus independent of the width.
+
+And this is what we observe in practice when we sweep for the optimal LR :
+
+<p align="center">
+    <img src="assets/sweep_mamba2.png" alt="a python and a mamba" 
+    width="900" height="340" alt="python mamba"/>
+</p>
+
+The optimal LR shifts with bigger models under SP, whereas, with muP, it stays roughly constant. The smaller model has only 172k params, while the bigger has over 100M!
+
+For more information about muP in general, you can take a look at the [paper](https://arxiv.org/abs/2203.03466), and to see my derivation of the muP implementation for Mamba, and what it changes concretly in code, please see the [associated PR](https://github.com/alxndrTL/mamba.py/pull/50).
 
 ___
 ## Performances
@@ -178,7 +217,7 @@ ___
 - [a minimal PyTorch implementation of Mamba](https://github.com/johnma2006/mamba-minimal), which implements the scan operation as a sequential loop (its performance are a bit worse than the 'sequential' line in the first graph). This code closely follows [this file](https://github.com/state-spaces/mamba/blob/da2626b5a5f347a8e844ac5e96a2cbcde3c34abb/mamba_ssm/modules/mamba_simple.py) from the officile Mamba implementation, but replaces the CUDA convolution with `torch.nn.Conv1d`, and the selective scan written in CUDA with a sequential loop. The code of this repo follows the structure of these 2 files.
 - [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf), by Guy E. Blelloch (1993).
 - [Parallelizing Linear Recurrent Neural Nets Over Sequence Length](https://arxiv.org/abs/1709.04057) : applies a parallel scan over the sequence in order to get rid of the sequential for-loop.
-- x.com/fchollet : original pscan implementation.
+- x.com/francoisfleuret : original pscan implementation.
 
 ## TODOs
 - finish docs
@@ -197,3 +236,17 @@ perfs related:
 ~~- write a reverse parallel scan specifically for the backward pass. (For now, we have to flip the array before and after the scan).~~
 - reduce the memory usage somehow (at the cost of speed if needed)
 - use torch.compile(). As far as I tested, it doesn’t work for now. It seems it isn’t happy with the custom PScan autograd function. Need to investigate. <b>(see [PR#1](https://github.com/alxndrTL/mamba.py/pull/1))</b>
+
+## Citation
+
+If you find this project useful in your research and wish to cite it, please use the following BibTex entry:
+
+```
+@software{mambapy,
+  author = {Alexandre Torres--Leguet},
+  title = {mamba.py: A simple, hackable and efficient Mamba implementation in pure PyTorch and MLX.},
+  url = {https://github.com/alxndrTL/mamba.py},
+  version = {1.0},
+  year = {2024},
+}
+```

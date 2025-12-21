@@ -190,33 +190,29 @@ def train(pretrained=False):
 
             logits = model(input)
 
-            # If the batch is not complete - skip
-            if (logits.view(-1, logits.size(-1)).shape[0] != output.view(-1).shape[0]):
-                print("skip")
-            else:
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), output)
-                avg_loss += loss.item()
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), output)
+            avg_loss += loss.item()
 
-                optim.zero_grad()
-                loss.backward()
-                optim.step()
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
 
-                t1_stop = perf_counter()
+            t1_stop = perf_counter()
 
-                # Print the progress during training and save the model
-                if i%10==0:
-                    print(f"\r> Batch: {idx}/{train_data.shape[-1]-seq_length} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
+            # Print the progress during training and save the model
+            if i%10==0:
+                print(f"\r> Batch: {idx}/{train_data.shape[-1]-seq_length} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
 
-                    checkpoint = {
-                        'epoch': z,
-                        'model_state': model.state_dict(),
-                        'optimizer_state': optim.state_dict(),
-                        'scheduler_state': scheduler.state_dict(),
-                    }
-                    # Create backup file
-                    if backup_path is not None and os.path.isfile(model_path):
-                        shutil.copyfile(model_path, backup_path)
-                    torch.save(checkpoint, model_path)
+                checkpoint = {
+                    'epoch': z,
+                    'model_state': model.state_dict(),
+                    'optimizer_state': optim.state_dict(),
+                    'scheduler_state': scheduler.state_dict(),
+                }
+                # Create backup file
+                if backup_path is not None and os.path.isfile(model_path):
+                    shutil.copyfile(model_path, backup_path)
+                torch.save(checkpoint, model_path)
 
             # Increment idx
             idx += 1

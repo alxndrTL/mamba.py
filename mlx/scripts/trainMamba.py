@@ -174,20 +174,18 @@ def train(pretrained=False):
             # Force a graph evaluation
             mx.eval(model.parameters(), optimizer.state)
 
-            # If the batch is not complete - skip
-            if True:
-                avg_loss += loss.item()
+            avg_loss += loss.item()
 
-                t1_stop = perf_counter()
+            t1_stop = perf_counter()
 
-                # Print the progress during training and save the model
-                if i%10==0:
-                    print(f"\r> Batch: {idx}/{train_data.shape[-1]-seq_length} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
+            # Print the progress during training and save the model
+            if i%10==0:
+                print(f"\r> Batch: {idx}/{train_data.shape[-1]-seq_length} loss: {avg_loss/(i+1):.5f} time: {t1_stop-t1_start:.2f} sec ", end="")
 
-                    # Create backup file
-                    if backup_path is not None and os.path.isfile(model_path):
-                        shutil.copyfile(model_path, backup_path)
-                    model.save_weights(model_path)
+                # Create backup file
+                if backup_path is not None and os.path.isfile(model_path):
+                    shutil.copyfile(model_path, backup_path)
+                model.save_weights(model_path)
 
             # Increment idx
             idx += 1
