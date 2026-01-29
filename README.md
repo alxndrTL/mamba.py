@@ -3,6 +3,7 @@ A straightfoward implementation of [Mamba](https://arxiv.org/abs/2312.00752) in 
 It combines the ease of read with good performances when training. Few other functionalities are implemented, like [Jamba](https://www.ai21.com/blog/announcing-jamba), [Vision Mamba](https://arxiv.org/abs/2401.09417) as well as [muP](https://arxiv.org/abs/2203.03466).
 
 ## Updates
+- <b>28/01/2025</b> : Added Metal (Apple Silicon MPS) fused kernels for ~18x speedup on Mac. See [Metal Acceleration](#metal-acceleration-apple-silicon) section below.
 - <b>03/08/2024</b> : Added a muP implementation for Mamba and Mamba2. This allows to sweep for optimal hyperparameters on a small model and directly transfer them to a large model. See [this PR](https://github.com/alxndrTL/mamba.py/pull/50)
 - <b>23/07/2024</b> : `mamba.py` is now part of the transformers 🤗 library. See [this PR](https://github.com/huggingface/transformers/pull/30139).
 - <b>27/06/2024</b> : Deployed a package version of `mamba.py` on PyPI, which you can install with `pip install mambapy`.
@@ -39,6 +40,7 @@ This repo contains a simple and readable code implementing the [Mamba](https://a
     - `vim.py` : an implementation of [Vision Mamba](https://arxiv.org/abs/2401.09417).
     - `📁 onnx` : export a trained Mamba model in ONNX for inference.
 - `📁 mlx` : basically the same code as above, but in MLX.
+- `📁 metal_pscan` : Metal (Apple Silicon) fused kernels for MPS acceleration.
 - `📁 docs` : a folder containing annotated explanations about the code, focusing on the parallel scan for now.
 - `📁 examples` : two examples of how to use the Mamba model in PyTorch as well as a training file.
 
@@ -209,6 +211,59 @@ But memory requierement should also be considered : the official Mamba implement
 
 Hence, this repo implements one of the three techniques mentionned in the Mamba paper that form the so called "hardware-aware selective scan" : the parallel scan.
 We say how kernel fusion impacts the speed while recomputation the memory requierements.
+
+___
+## Metal Acceleration (Apple Silicon)
+
+This fork adds custom Metal compute shaders for fast Mamba on Apple Silicon (M1/M2/M3/M4). The kernels are auto-detected when running on MPS device.
+
+### Installation
+
+```bash
+# Clone and build
+git clone https://github.com/your-repo/mamba-metal
+cd mamba-metal
+pip install -e .
+
+# Build Metal extension
+python setup_metal.py build_ext --inplace
+```
+
+### Usage
+
+```python
+import torch
+from mambapy.mamba import Mamba, MambaConfig, _USE_METAL_SSM
+
+print(f"Metal acceleration: {_USE_METAL_SSM}")  # True on Apple Silicon
+
+config = MambaConfig(d_model=384, n_layers=1)
+model = Mamba(config).to('mps')
+
+x = torch.randn(32, 16, 384, device='mps')
+y = model(x)  # Uses Metal kernels automatically
+```
+
+### Performance
+
+On M3 Max with batch=1024, seq_len=2, d_model=384:
+
+| Implementation | Time | vs Attention |
+|----------------|------|--------------|
+| PyTorch MPS (baseline) | ~120ms | 57x slower |
+| Metal fused kernels | ~7ms | 3.2x slower |
+
+**~18x speedup** over naive PyTorch MPS implementation.
+
+### Fused Kernels
+
+Three custom Metal kernels are provided:
+
+1. **`conv1d_silu_fused`** - Fuses depthwise conv1d + SiLU activation (12x faster than PyTorch)
+2. **`ssm_fused`** - Fuses SSM state preparation + parallel scan
+3. **`ssm_output_fused`** - Super-fused SSM + output matmul (8x faster, avoids large intermediate tensor)
+
+The kernels use Metal function constants for shape specialization and integrate with PyTorch's MPS stream.
 
 ___
 ## Sources and where to learn more

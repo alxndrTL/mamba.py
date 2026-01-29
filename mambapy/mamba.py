@@ -8,6 +8,23 @@ import torch.nn.functional as F
 
 from mambapy.pscan import pscan
 
+# Try to use fused Metal kernels
+_USE_METAL_SSM = False
+_USE_METAL_CONV = False
+_metal_ssm_fused = None
+_metal_ssm_output_fused = None
+_metal_conv1d_silu = None
+try:
+    import metal_pscan._C as _metal_C
+    if _metal_C.is_available():
+        _metal_ssm_fused = _metal_C.ssm_fused
+        _metal_ssm_output_fused = _metal_C.ssm_output_fused
+        _metal_conv1d_silu = _metal_C.conv1d_silu
+        _USE_METAL_SSM = True
+        _USE_METAL_CONV = True
+except ImportError:
+    pass
+
 """
 
 This file closely follows the mamba_simple.py from the official Mamba implementation, and the mamba-minimal by @johnma2006.
@@ -240,12 +257,16 @@ class MambaBlock(nn.Module):
         xz = self.in_proj(x) # (B, L, 2*ED)
         x, z = xz.chunk(2, dim=-1) # (B, L, ED), (B, L, ED)
 
-        # x branch
-        x = x.transpose(1, 2) # (B, ED, L)
-        x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
-        x = x.transpose(1, 2) # (B, L, ED)
-
-        x = F.silu(x)
+        # x branch
+        x = x.transpose(1, 2) # (B, ED, L)
+        if _USE_METAL_CONV and x.device.type == 'mps':
+            # Fused Metal kernel: conv1d + silu in one pass
+            x = _metal_conv1d_silu(x.contiguous(), self.conv1d.weight, self.conv1d.bias)
+            x = x.transpose(1, 2)  # (B, L, ED)
+        else:
+            x = self.conv1d(x)[:, :, :L] # depthwise convolution over time, with a short filter
+            x = x.transpose(1, 2) # (B, L, ED)
+            x = F.silu(x)
         y = self.ssm(x, z)
 
         if self.config.use_cuda:
@@ -299,25 +320,25 @@ class MambaBlock(nn.Module):
         return y
     
     def selective_scan(self, x, delta, A, B, C, D):
-        # x : (B, L, ED)
-        # Δ : (B, L, ED)
-        # A : (ED, N)
-        # B : (B, L, N)
-        # C : (B, L, N)
-        # D : (ED)
+        # x : (B, L, ED)
+        # Δ : (B, L, ED)
+        # A : (ED, N)
+        # B : (B, L, N)
+        # C : (B, L, N)
+        # D : (ED)
 
-        # y : (B, L, ED)
+        # y : (B, L, ED)
 
-        deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, L, ED, N)
-        deltaB = delta.unsqueeze(-1) * B.unsqueeze(2) # (B, L, ED, N)
-
-        BX = deltaB * (x.unsqueeze(-1)) # (B, L, ED, N)
-        
-        hs = pscan(deltaA, BX)
-
-        y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
-
-        y = y + D * x
+        if _USE_METAL_SSM and x.device.type == 'mps':
+            # Super-fused Metal kernel: ssm + output matmul in one
+            y = _metal_ssm_output_fused(delta, A, B, x, C, D)
+        else:
+            deltaA = torch.exp(delta.unsqueeze(-1) * A) # (B, L, ED, N)
+            deltaB = delta.unsqueeze(-1) * B.unsqueeze(2) # (B, L, ED, N)
+            BX = deltaB * (x.unsqueeze(-1)) # (B, L, ED, N)
+            hs = pscan(deltaA, BX)
+            y = (hs @ C.unsqueeze(-1)).squeeze(3) # (B, L, ED, N) @ (B, L, N, 1) -> (B, L, ED, 1)
+            y = y + D * x
 
         return y
     

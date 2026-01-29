@@ -2,4 +2,6 @@
 **/*.npz
 old_tests/
 *.egg-info/
+build/metal_pscan/*.so
+metal_pscan/__pycache__/
 build/
