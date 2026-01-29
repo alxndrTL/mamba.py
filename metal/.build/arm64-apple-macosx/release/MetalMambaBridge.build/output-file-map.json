@@ -1,0 +1,12 @@
+{
+  "": {
+    "dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MetalMambaBridge.d",
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MetalMambaBridge.o",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/master.swiftdeps"
+  },
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift": {
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge.swift.o",
+    "swiftmodule": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge~partial.swiftmodule",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge.swiftdeps"
+  }
+}

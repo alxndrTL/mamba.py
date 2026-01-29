@@ -1,0 +1,605 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba_MetalMamba.bundle/pscan.metal" : {
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/pscan.metal"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba_MetalMamba.bundle/pscan.metal"
+        }
+      ]
+    }
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.MetalMamba-arm64-apple-macosx16.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/sources",
+      "importPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<MetalMamba-arm64-apple-macosx16.0-release.module-resources>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MetalMamba",
+      "moduleOutputPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMamba.swiftmodule",
+      "objects" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-module-cache-path",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/MetalMamba-Swift.h",
+        "-swift-version",
+        "5",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "metal"
+      ],
+      "outputFileMapPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMamba.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift"
+      ],
+      "tempsPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.MetalMambaBridge-arm64-apple-macosx16.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/sources",
+      "importPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMamba.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MetalMambaBridge",
+      "moduleOutputPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMambaBridge.swiftmodule",
+      "objects" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-module-cache-path",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MetalMambaBridge-Swift.h",
+        "-swift-version",
+        "5",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "metal"
+      ],
+      "outputFileMapPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMambaBridge.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift"
+      ],
+      "tempsPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.TestPScan-arm64-apple-macosx16.0-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/sources",
+      "importPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/MetalMamba.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "TestPScan",
+      "moduleOutputPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/TestPScan.swiftmodule",
+      "objects" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-O",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-module-cache-path",
+        "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "TestPScan_main",
+        "-swift-version",
+        "5",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "metal"
+      ],
+      "outputFileMapPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules/TestPScan.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift"
+      ],
+      "tempsPath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "MetalMamba" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "MetalMamba",
+      "-package-name",
+      "metal",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-c",
+      "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift",
+      "-I",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-module-cache-path",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/MetalMamba-Swift.h",
+      "-swift-version",
+      "5",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "metal",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "MetalMambaBridge" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "MetalMambaBridge",
+      "-package-name",
+      "metal",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-c",
+      "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift",
+      "-I",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-module-cache-path",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MetalMambaBridge-Swift.h",
+      "-swift-version",
+      "5",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "metal",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "TestPScan" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TestPScan",
+      "-package-name",
+      "metal",
+      "-whole-module-optimization",
+      "-num-threads",
+      "10",
+      "-c",
+      "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift",
+      "-I",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-O",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-module-cache-path",
+      "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "TestPScan_main",
+      "-swift-version",
+      "5",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "metal",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "MetalMamba" : [
+
+    ],
+    "MetalMambaBridge" : [
+      "MetalMamba"
+    ],
+    "TestPScan" : [
+      "MetalMamba"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "writeCommands" : {
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/sources"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.product/Objects.LinkFileList"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/sources"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.build/MambaBridge.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMambaBridge.product/Objects.LinkFileList"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/sources"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+    },
+    "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/test-pscan.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/test-pscan.product/Objects.LinkFileList"
+    }
+  }
+}

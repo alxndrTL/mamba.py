@@ -1,0 +1,17 @@
+{
+  "": {
+    "dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/MetalMamba.d",
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/MetalMamba.o",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/master.swiftdeps"
+  },
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift": {
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swift.o",
+    "swiftmodule": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel~partial.swiftmodule",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/PScanKernel.swiftdeps"
+  },
+  "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift": {
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swift.o",
+    "swiftmodule": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor~partial.swiftmodule",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/resource_bundle_accessor.swiftdeps"
+  }
+}

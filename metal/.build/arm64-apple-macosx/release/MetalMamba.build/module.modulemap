@@ -1,0 +1,4 @@
+module MetalMamba {
+    header "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/MetalMamba-Swift.h"
+    requires objc
+}

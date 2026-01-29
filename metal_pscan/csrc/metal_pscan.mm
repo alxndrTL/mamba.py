@@ -374,14 +374,10 @@ torch::Tensor metal_pscan_forward(
     std::string kernelName = "pscan_forward";
     auto pipeline = getOrCreatePipeline(device, kernelName, B, L, D, N);
 
-    // Get MPS stream and synchronize to ensure input tensors are ready
-    auto stream = at::mps::getCurrentMPSStream();
-    stream->synchronize(at::mps::SyncType::COMMIT_AND_WAIT);
-
+    // Get MPS stream and use PyTorch's shared command encoder (zero-sync)
     @autoreleasepool {
-        id<MTLCommandQueue> queue = stream->commandQueue();
-        id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+        auto stream = at::mps::getCurrentMPSStream();
+        id<MTLComputeCommandEncoder> encoder = stream->commandEncoder();
 
         [encoder setComputePipelineState:pipeline];
 
@@ -400,9 +396,7 @@ torch::Tensor metal_pscan_forward(
         [encoder dispatchThreadgroups:MTLSizeMake(numThreadgroups, 1, 1)
                 threadsPerThreadgroup:MTLSizeMake(blockSize, 1, 1)];
 
-        [encoder endEncoding];
-        [cmdBuf commit];
-        [cmdBuf waitUntilCompleted];
+        // Don't endEncoding/commit - PyTorch manages encoder lifecycle
     }
 
     return H;
@@ -433,13 +427,10 @@ std::vector<torch::Tensor> metal_pscan_backward(
 
     id<MTLDevice> device = getMetalDevice();
     auto pipeline = getOrCreatePipeline(device, "pscan_backward", B, L, D, N);
-    auto stream = at::mps::getCurrentMPSStream();
-    stream->synchronize(at::mps::SyncType::COMMIT_AND_WAIT);
 
     @autoreleasepool {
-        id<MTLCommandQueue> queue = stream->commandQueue();
-        id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+        auto stream = at::mps::getCurrentMPSStream();
+        id<MTLComputeCommandEncoder> encoder = stream->commandEncoder();
 
         [encoder setComputePipelineState:pipeline];
 
@@ -456,9 +447,7 @@ std::vector<torch::Tensor> metal_pscan_backward(
         [encoder dispatchThreadgroups:MTLSizeMake(numThreadgroups, 1, 1)
                 threadsPerThreadgroup:MTLSizeMake(blockSize, 1, 1)];
 
-        [encoder endEncoding];
-        [cmdBuf commit];
-        [cmdBuf waitUntilCompleted];
+        // Don't endEncoding/commit - PyTorch manages encoder lifecycle
     }
 
     return {grad_A, grad_X};
@@ -497,15 +486,10 @@ torch::Tensor metal_ssm_fused(
     id<MTLDevice> device = getMetalDevice();
     auto pipeline = getOrCreatePipeline(device, "ssm_fused", B, L, D, N);
 
-    // Use MPS stream
-    auto stream = at::mps::getCurrentMPSStream();
-    // Commit pending MPS work (non-blocking)
-    stream->synchronize(at::mps::SyncType::COMMIT);
-
+    // Use MPS stream with PyTorch's shared encoder (zero-sync)
     @autoreleasepool {
-        id<MTLCommandQueue> queue = stream->commandQueue();
-        id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+        auto stream = at::mps::getCurrentMPSStream();
+        id<MTLComputeCommandEncoder> encoder = stream->commandEncoder();
 
         [encoder setComputePipelineState:pipeline];
 
@@ -522,9 +506,7 @@ torch::Tensor metal_ssm_fused(
         [encoder dispatchThreadgroups:MTLSizeMake(numThreadgroups, 1, 1)
                 threadsPerThreadgroup:MTLSizeMake(blockSize, 1, 1)];
 
-        [encoder endEncoding];
-        [cmdBuf commit];
-        [cmdBuf waitUntilCompleted];  // Still need to wait for our kernel
+        // Don't endEncoding/commit - PyTorch manages encoder lifecycle
     }
 
     return H;
@@ -600,15 +582,10 @@ torch::Tensor metal_conv1d_silu(
         pipelineCache[key] = pipeline;
     }
 
-    // Use MPS stream
-    auto stream = at::mps::getCurrentMPSStream();
-    // Commit pending MPS work (non-blocking)
-    stream->synchronize(at::mps::SyncType::COMMIT);
-
+    // Use MPS stream with PyTorch's shared encoder (zero-sync)
     @autoreleasepool {
-        id<MTLCommandQueue> queue = stream->commandQueue();
-        id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+        auto stream = at::mps::getCurrentMPSStream();
+        id<MTLComputeCommandEncoder> encoder = stream->commandEncoder();
 
         [encoder setComputePipelineState:pipeline];
 
@@ -624,9 +601,7 @@ torch::Tensor metal_conv1d_silu(
         [encoder dispatchThreadgroups:MTLSizeMake(numThreadgroups, 1, 1)
                 threadsPerThreadgroup:MTLSizeMake(blockSize, 1, 1)];
 
-        [encoder endEncoding];
-        [cmdBuf commit];
-        [cmdBuf waitUntilCompleted];  // Still need to wait for our kernel
+        // Don't endEncoding/commit - PyTorch manages encoder lifecycle
     }
 
     return y;
@@ -663,14 +638,10 @@ torch::Tensor metal_ssm_output_fused(
     id<MTLDevice> device = getMetalDevice();
     auto pipeline = getOrCreatePipeline(device, "ssm_output_fused", B, L, D, N);
 
-    auto stream = at::mps::getCurrentMPSStream();
-    // Flush pending MPS work but don't wait - just commit so our work goes after it
-    stream->synchronize(at::mps::SyncType::COMMIT);
-
+    // Use MPS stream with PyTorch's shared encoder (zero-sync)
     @autoreleasepool {
-        id<MTLCommandQueue> queue = stream->commandQueue();
-        id<MTLCommandBuffer> cmdBuf = [queue commandBuffer];
-        id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
+        auto stream = at::mps::getCurrentMPSStream();
+        id<MTLComputeCommandEncoder> encoder = stream->commandEncoder();
 
         [encoder setComputePipelineState:pipeline];
 
@@ -689,9 +660,7 @@ torch::Tensor metal_ssm_output_fused(
         [encoder dispatchThreadgroups:MTLSizeMake(numThreadgroups, 1, 1)
                 threadsPerThreadgroup:MTLSizeMake(blockSize, 1, 1)];
 
-        [encoder endEncoding];
-        [cmdBuf commit];
-        [cmdBuf waitUntilCompleted];  // Still need to wait for our kernel
+        // Don't endEncoding/commit - PyTorch manages encoder lifecycle
     }
 
     return y;

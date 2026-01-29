@@ -1,0 +1,8 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "720a638fa3da85d854204ab9e5694c467be21229f0af850b404b8a95055d369b"
+build_start_time: [1769628402, 371033000]
+build_end_time: [1769628405, 577982000]
+inputs:
+  ? "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/MetalMamba.build/DerivedSources/resource_bundle_accessor.swift"
+  : [1769628402, 88036143]
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMamba/PScanKernel.swift": [1769628261, 716171773]
