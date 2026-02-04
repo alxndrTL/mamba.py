@@ -19,6 +19,13 @@ try:
     # The extension is built as metal_pscan._C
     import metal_pscan._C as _C
     _HAS_METAL = _C.is_available()
+
+    # Register torch.compile ops (import triggers registration)
+    try:
+        from . import torch_ops
+    except Exception as e:
+        pass  # torch_ops is optional, don't fail if it can't load
+
 except ImportError as e:
     print(f"Metal pscan C++ extension not found: {e}")
     print("Build with: cd mamba-metal && python setup_metal.py build_ext --inplace")

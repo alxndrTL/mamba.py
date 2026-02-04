@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 from mambapy.pscan import pscan
 
-# Try to use fused Metal kernels
+# Try to use fused Metal kernels (with torch.compile support)
 _USE_METAL_SSM = False
 _USE_METAL_CONV = False
 _metal_ssm_fused = None
@@ -17,9 +17,18 @@ _metal_conv1d_silu = None
 try:
     import metal_pscan._C as _metal_C
     if _metal_C.is_available():
-        _metal_ssm_fused = _metal_C.ssm_fused
-        _metal_ssm_output_fused = _metal_C.ssm_output_fused
-        _metal_conv1d_silu = _metal_C.conv1d_silu
+        # Import torch_ops to register torch.compile support
+        try:
+            import metal_pscan.torch_ops
+            # Use torch.ops for torch.compile compatibility
+            _metal_ssm_fused = torch.ops.metal_pscan.ssm_fused
+            _metal_ssm_output_fused = torch.ops.metal_pscan.ssm_output_fused
+            _metal_conv1d_silu = torch.ops.metal_pscan.conv1d_silu
+        except Exception:
+            # Fallback to direct _C calls if torch_ops fails
+            _metal_ssm_fused = _metal_C.ssm_fused
+            _metal_ssm_output_fused = _metal_C.ssm_output_fused
+            _metal_conv1d_silu = _metal_C.conv1d_silu
         _USE_METAL_SSM = True
         _USE_METAL_CONV = True
 except ImportError:
