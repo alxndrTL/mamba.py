@@ -110,6 +110,27 @@ class Mamba(nn.Module):
         
         return x_seq, caches
 
+    def checkpointed_chunk_step(self, x_seq, caches, segment_size):
+        # x_seq : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+        # segment_size : int
+
+        # y_seq : (B, L, D)
+        # caches : [cache(layer) for all layers], cache : (h, inputs)
+
+        # same as chunk_step, but with activation checkpointing for memory-efficient BPTT
+
+        from mambapy.checkpointing import checkpointed_sequence
+
+        L = x_seq.size(1)
+        num_segments = (L + segment_size - 1) // segment_size
+        segments = [x_seq[:, i * segment_size : (i + 1) * segment_size] for i in range(num_segments)]
+
+        outputs, final_state = checkpointed_sequence(self.chunk_step, segments, caches)
+        y_seq = torch.cat(outputs, dim=1)
+
+        return y_seq, final_state
+
 class ResidualBlock(nn.Module):
     def __init__(self, config: MambaConfig):
         super().__init__()
