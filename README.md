@@ -116,7 +116,7 @@ The API is the same as with the `Mamba` and `MambaLM` models.
 You can load a pretrained Jamba model like so :
 
 ```python
-from mambapy.jamba_lm import from_pretrained
+from mambapy.jamba import from_pretrained
 from transformers import AutoTokenizer
 
 model = from_pretrained('TechxGenus/Mini-Jamba').to("cuda")
