@@ -1,0 +1,6 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "adbdad15622d4c201b9818ca9d0d5910605fcfce823a2abebcd007bf83e3b250"
+build_start_time: [1769628405, 696466000]
+build_end_time: [1769628406, 467129000]
+inputs:
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift": [1769628372, 164501083]

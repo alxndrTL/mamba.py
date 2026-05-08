@@ -1,0 +1,6 @@
+version: "Apple Swift version 6.0 (swiftlang-6.0.0.9.10 clang-1600.0.26.2)"
+options: "3f042d8518cb5c2539f1234b3606a8282fab287d96307444eab046f9e20d4b4a"
+build_start_time: [1769628405, 697436000]
+build_end_time: [1769628405, 977502000]
+inputs:
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/MetalMambaBridge/MambaBridge.swift": [1769628331, 382887689]

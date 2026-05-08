@@ -1,0 +1,12 @@
+{
+  "": {
+    "dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/TestPScan.d",
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/TestPScan.o",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/master.swiftdeps"
+  },
+  "/Users/zimski/projects/oss/mamba-metal/metal/Sources/TestPScan/main.swift": {
+    "object": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main.swift.o",
+    "swiftmodule": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/zimski/projects/oss/mamba-metal/metal/.build/arm64-apple-macosx/release/TestPScan.build/main.swiftdeps"
+  }
+}
