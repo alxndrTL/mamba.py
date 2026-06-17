@@ -2,12 +2,6 @@ name: Port rsi-metaforge to mamba.py
 
 on:
   workflow_dispatch:
-    inputs:
-      auto_merge:
-        description: 'Auto-merge the Pull Request after creation and check passes?'
-        type: boolean
-        required: false
-        default: true
 
 jobs:
   port_and_merge:
@@ -78,7 +72,6 @@ jobs:
           echo "PR Created: $pr_url"
 
       - name: Merge Pull Request
-        if: ${{ inputs.auto_merge == true }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
