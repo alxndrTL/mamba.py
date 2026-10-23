@@ -6,6 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'torch',
+        'einops',
     ],
     author='Alexandre TL',
     author_email='alexandretl3434@gmail.com',

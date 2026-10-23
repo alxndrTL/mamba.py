@@ -74,7 +74,7 @@ The class `LM` ([lm.py](lm.py)) builds on the `Mamba` or `Mamba-2` objects and o
 from mambapy.lm import LM, MambaConfig
 
 config = MambaConfig(d_model=16, n_layers=4) # core model
-model = MambaLM(config, vocab_size=32000) # encapsulate it in a LM
+model = LM(config, vocab_size=32000) # encapsulate it in a LM
 
 x = torch.randint(high=32000, size=(16, 64))
 logits = model(x) # (B, L, vocab_size)
@@ -90,7 +90,10 @@ from transformers import AutoTokenizer
 model = from_pretrained('state-spaces/mamba-130m').to("cuda")
 tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-neox-20b')
 
-output = model.generate(tokenizer, "Mamba is a type of")
+prompt = tokenizer("Mamba is a type of", return_tensors="pt").input_ids
+prompt = prompt.to(next(model.parameters()).device)
+output = model.generate(prompt, num_tokens=50, top_k=40)
+print(tokenizer.decode(output[0], skip_special_tokens=True))
 ```
 
 This is the structure of the `mamba.py` modules:
