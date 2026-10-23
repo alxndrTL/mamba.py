@@ -25,6 +25,7 @@ class LM(nn.Module):
             vocab_size += (pad_vocab_size_multiple - vocab_size % pad_vocab_size_multiple)
 
         self.config = model_config
+        self.vocab_size = vocab_size
 
         self.embedding = nn.Embedding(vocab_size, self.config.d_model, padding_idx=0)
         
